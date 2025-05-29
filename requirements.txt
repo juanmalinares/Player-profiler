@@ -1,7 +1,3 @@
--streamlit
--pandas
--numpy
--streamlit-pwa
-+streamlit
-+pandas
-+numpy
+streamlit
+pandas
+numpy
