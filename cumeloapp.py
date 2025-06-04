@@ -11,14 +11,59 @@ ARCHIVO_DATOS = 'players.json'
 if 'editing' not in st.session_state:
     st.session_state.editing = None
 
-# Funciones para cargar y guardar datos
+# ATRIBUTOS DE ROLES (según tus definiciones)
+GLADIADOR_ATTRS = [
+    "Resilience_When_Behind", "Composure", "Strength_in_Duels", "Stamina",
+    "Recovery_Runs", "Pressing_Consistency", "Marking_Tightness"
+]
+ORQUESTADOR_ATTRS = [
+    "First_Touch_Control", "Short_Passing_Accuracy", "Vision_Free_Player",
+    "Ball_Retention", "Tactical_Awareness", "Balance", "Decision_Making_Speed",
+    "Creativity", "Leadership_Presence", "Communication", "Spatial_Awareness"
+]
+WILDCARD_OFF = [
+    "Acceleration", "Dribbling_Efficiency", "Power_Dribble_and_Score",
+    "Finishing_Precision", "Attack_Transition"
+]
+WILDCARD_DEF = [
+    "Pressing_Consistency", "Marking_Tightness", "Recovery_Runs", "Strength_in_Duels"
+]
+MURALLA_ATTRS = [
+    "Strength_in_Duels", "Defense_Transition", "Leadership_Presence",
+    "Recovery_Runs", "Pressing_Consistency", "Marking_Tightness", "Tactical_Awareness"
+]
+ARQUERO_ATTRS = [
+    "GK_Reaction", "GK_Positioning", "GK_Foot_Play", "GK_Agility", "GK_Bravery", "GK_Distribution"
+]
 
+# FUNCIONES PARA CADA ROL
+def score_gladiador(attrs):
+    return sum(attrs.get(k, 0) for k in GLADIADOR_ATTRS)
+
+def score_orquestador(attrs):
+    return sum(attrs.get(k, 0) for k in ORQUESTADOR_ATTRS)
+
+def score_wildcard(attrs):
+    # Suma de ofensivos menos suma de defensivos (defensivos penalizan)
+    off = sum(attrs.get(k, 0) for k in WILDCARD_OFF)
+    # Para WILDCARD, menor defensa = mayor score
+    # Se invierte la suma defensiva (5-puntaje, pues sliders de 0 a 5)
+    defense = sum(5 - attrs.get(k, 0) for k in WILDCARD_DEF)
+    return off + defense
+
+def score_muralla(attrs):
+    return sum(attrs.get(k, 0) for k in MURALLA_ATTRS)
+
+def score_arquero(attrs):
+    # GK_Reaction es clave, pero suma todo para ranking completo
+    return sum(attrs.get(k, 0) for k in ARQUERO_ATTRS)
+
+# Funciones para cargar y guardar datos
 def cargar_datos():
     if os.path.exists(ARCHIVO_DATOS):
         with open(ARCHIVO_DATOS, 'r') as f:
             return json.load(f)
     return {}
-
 
 def guardar_datos(datos):
     with open(ARCHIVO_DATOS, 'w') as f:
@@ -63,17 +108,14 @@ ATRIBUTOS_ARQUERO = [
     ("GK_Distribution", "¿Qué precisión tiene al distribuir balones largos y cortos?"),
 ]
 
-# Tipos de jugador y GK opcionales para campo
 TIPOS_JUGADOR = ["Campo", "Arquero"]
 ATR_GK_CAMPO = ["GK_Foot_Play", "GK_Agility", "GK_Bravery"]
 
-# Función principal
 def main():
     st.title("Perfilador de Jugadores 5v5 de Fútbol")
     barra = st.sidebar
     barra.header("Menú")
     accion = barra.selectbox("Elige acción:", ["Agregar Jugador", "Ver Perfiles", "Analizar Equipos"])
-    # Si estamos en modo edición, forzar pantalla de Agregar Jugador
     if st.session_state.editing is not None:
         accion = "Agregar Jugador"
     datos = cargar_datos()
@@ -118,7 +160,6 @@ def main():
                     default = datos[nombre_edit]["Atributos"].get(clave, 2) if es_edicion else 2
                     attrs[clave] = st.slider(preg, 0, 5, default, key=clave)
             else:
-                # Atributos completos arquero
                 for clave, preg in ATRIBUTOS_ARQUERO:
                     default = datos[nombre_edit]["Atributos"].get(clave, 2) if es_edicion else 2
                     attrs[clave] = st.slider(preg, 0, 5, default, key=clave)
@@ -142,11 +183,15 @@ def main():
         st.markdown(f"**Total de jugadores evaluados:** {len(datos)}")
 
         if datos:
-            # Construir tabla
             filas = []
             for jug, info in datos.items():
                 fila = {"Nombre": jug, "Tipo": info["Tipo"]}
                 fila.update(info["Atributos"])
+                fila["Gladiador"] = score_gladiador(info["Atributos"])
+                fila["Orquestador"] = score_orquestador(info["Atributos"])
+                fila["Wildcard"] = score_wildcard(info["Atributos"])
+                fila["Muralla"] = score_muralla(info["Atributos"])
+                fila["Arquero"] = score_arquero(info["Atributos"])
                 filas.append(fila)
             df = pd.DataFrame(filas).set_index("Nombre")
             st.dataframe(df)
@@ -193,6 +238,13 @@ def main():
             st.markdown(f"**Más complementarios:** {mejor['A']} & {mejor['B']} (Dist {mejor['Dist']})")
             st.markdown(f"**Más similares:** {peor['A']} & {peor['B']} (Dist {peor['Dist']})")
 
+            # Mejor por rol
+            st.info(f"🥾 Mejor Gladiador: {max(nombres, key=lambda p: score_gladiador(datos[p]['Atributos']))}")
+            st.info(f"🎩 Mejor Orquestador: {max(nombres, key=lambda p: score_orquestador(datos[p]['Atributos']))}")
+            st.info(f"🔥 Mejor Wildcard: {max(nombres, key=lambda p: score_wildcard(datos[p]['Atributos']))}")
+            st.info(f"💪 Mejor Muralla: {max(nombres, key=lambda p: score_muralla(datos[p]['Atributos']))}")
+            st.info(f"🧤 Mejor Arquero: {max(nombres, key=lambda p: score_arquero(datos[p]['Atributos']))}")
+
         # Mejor equipo 5-a-side
         if len(nombres) >= 5:
             best_score, best_combo = -1, None
@@ -229,7 +281,10 @@ def main():
         # Dos equipos balanceados
         if len(nombres) >= 10:
             st.subheader("🤝 Dos Equipos Balanceados")
-            total = {p: sum(datos[p]['Atributos'].values()) for p in nombres}
+            total = {
+                p: sum(v for v in datos[p]['Atributos'].values() if isinstance(v, (int, float)))
+                for p in nombres
+            }
             orden = sorted(total, key=total.get, reverse=True)
             A, B = [], []
             for idx, p in enumerate(orden):
@@ -237,7 +292,6 @@ def main():
             st.write("**Equipo A:**", ", ".join(A[:5]))
             st.write("**Equipo B:**", ", ".join(B[:5]))
 
-    # Pie de página
     barra.write(f"**Jugadores:** {len(datos)}")
 
 if __name__ == "__main__":
