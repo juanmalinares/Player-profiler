@@ -62,6 +62,8 @@ def guardar_datos(datos):
         json.dump(datos, f, indent=4)
 
 def promedio_atributos(rankings_usuarios):
+    # Solo cuenta los rankings válidos
+    rankings_usuarios = {k: v for k, v in rankings_usuarios.items() if isinstance(v, dict) and "Atributos" in v}
     if not rankings_usuarios: return {}
     claves = set()
     for rank in rankings_usuarios.values():
@@ -120,9 +122,7 @@ def roles_scores(attrs):
     return principal, secundarios, porcentajes, roles
 
 # ========== DIFERENCIAL PARA RULETA RUSA ==========
-# Calcula el máximo diferencial entre los grupos Ataque, Defensa y Mental
 def score_ruletarusa(attrs):
-    # Agrupa atributos en tres dimensiones
     ataque = [
         "Acceleration","Attack_Transition","Finishing_Precision","Dribbling_Efficiency",
         "Power_Dribble_and_Score","First_Touch_Control","Short_Passing_Accuracy","Agility"
@@ -212,7 +212,8 @@ def main():
             for jug, rankings in datos.items():
                 if not rankings.get("convocado", True):
                     continue
-                rankings_usuarios = {k: v for k, v in rankings.items() if k not in ["convocado"]}
+                # Solo promedia usuarios con datos válidos
+                rankings_usuarios = {k: v for k, v in rankings.items() if isinstance(v, dict) and "Atributos" in v}
                 attrs_avg = promedio_atributos(rankings_usuarios)
                 tipos = [rank.get("Tipo") for rank in rankings_usuarios.values() if "Tipo" in rank]
                 tipo = max(set(tipos), key=tipos.count) if tipos else ""
@@ -238,7 +239,9 @@ def main():
         if len(nombres) < 5:
             st.warning("Se necesitan al menos 5 jugadores convocados.")
         else:
-            proms = {p: promedio_atributos({k:v for k,v in datos[p].items() if k not in ["convocado"]}) for p in nombres}
+            proms = {p: promedio_atributos({
+                k: v for k, v in datos[p].items() if isinstance(v, dict) and "Atributos" in v
+            }) for p in nombres}
 
             # TOP 3 de cada rol
             for rol, fun in [
@@ -294,12 +297,18 @@ def main():
                     proms[p].get("Spatial_Awareness",0)
                 )
             def score_ruleta(p):
-                return score_ruletarusa(proms[p]) # cuanto más grande, más desequilibrado
+                return score_ruletarusa(proms[p])
 
             def best_team(fun, nombre):
                 best, best_score = None, -1
                 for combo in combinations(nombres, 5):
-                    if sum(1 for p in combo if datos[p][next(iter([k for k in datos[p] if k not in ['convocado']]), None)]["Tipo"] == "Arquero") != 1:
+                    # busca uno solo que sea arquero
+                    if sum(
+                        1 for p in combo if any(
+                            isinstance(v, dict) and v.get("Tipo", "") == "Arquero"
+                            for v in datos[p].values() if isinstance(v, dict)
+                        )
+                    ) != 1:
                         continue
                     s = sum(fun(p) for p in combo)
                     if s > best_score:
