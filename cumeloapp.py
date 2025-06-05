@@ -24,7 +24,7 @@ EMOJI = {
     "Gladiador": "🦾",
     "Orquestador": "🧠",
     "Wildcard": "🎲",
-    "RuletaRusa": "💣",
+    "RuletaRusa": "🧊🔥",
     "TikiTaka": "🔄",
     "Catenaccio": "🧱",
     "Contraataque": "⚡"
