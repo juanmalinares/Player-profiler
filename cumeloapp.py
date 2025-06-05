@@ -6,7 +6,10 @@ from itertools import combinations
 import numpy as np
 
 # --- Constants ---
-ARCHIVO_DATOS = 'players.json'
+# Ensure the data file is resolved relative to this script so the app can be
+# executed from any working directory without losing access to the JSON data.
+ARCHIVO_DATOS = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             'players.json')
 KEY_TIPO = "Tipo"
 KEY_VOTACIONES = "votaciones"
 KEY_CONVOCADO = "convocado"
