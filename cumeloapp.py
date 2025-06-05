@@ -62,7 +62,6 @@ def guardar_datos(datos):
         json.dump(datos, f, indent=4)
 
 def promedio_atributos(rankings_usuarios):
-    # Solo cuenta los rankings válidos
     rankings_usuarios = {k: v for k, v in rankings_usuarios.items() if isinstance(v, dict) and "Atributos" in v}
     if not rankings_usuarios: return {}
     claves = set()
@@ -121,7 +120,6 @@ def roles_scores(attrs):
     secundarios = sorted([k for k in roles if k != principal], key=lambda k: roles[k], reverse=True)
     return principal, secundarios, porcentajes, roles
 
-# ========== DIFERENCIAL PARA RULETA RUSA ==========
 def score_ruletarusa(attrs):
     ataque = [
         "Acceleration","Attack_Transition","Finishing_Precision","Dribbling_Efficiency",
@@ -243,7 +241,6 @@ def main():
             for jug, rankings in datos.items():
                 if not rankings.get("convocado", True):
                     continue
-                # Solo promedia usuarios con datos válidos
                 rankings_usuarios = {k: v for k, v in rankings.items() if isinstance(v, dict) and "Atributos" in v}
                 attrs_avg = promedio_atributos(rankings_usuarios)
                 tipos = [rank.get("Tipo") for rank in rankings_usuarios.values() if "Tipo" in rank]
@@ -303,7 +300,7 @@ def main():
                 usados.add(pick)
             st.markdown(f"<span style='color:#c1121f; font-size:1.2rem;'><b>Mejor Equipo 5-a-side (Roles nuevos):</b> {', '.join(equipo)}</span>", unsafe_allow_html=True)
 
-            # Equipos especiales
+            # Mejor Catenaccio (más defensivos, mucha muralla+gladiador+mental)
             def score_cat(p):
                 return (
                     score_muralla(proms[p]) + score_gladiador(proms[p]) +
@@ -311,6 +308,14 @@ def main():
                     proms[p].get("Leadership_Presence",0) + proms[p].get("Communication",0) +
                     proms[p].get("Stamina",0) + proms[p].get("Recovery_Runs",0)
                 )
+            # Mejor Contraataque (wildcard, ataque y velocidad)
             def score_contra(p):
+                ofens = score_wildcard(proms[p]) + proms[p].get("Acceleration",0) + proms[p].get("Attack_Transition",0)
+                skill = proms[p].get("First_Touch_Control",0)+proms[p].get("Short_Passing_Accuracy",0)+proms[p].get("Finishing_Precision",0)
+                skill += proms[p].get("Dribbling_Efficiency",0)+proms[p].get("Power_Dribble_and_Score",0)+proms[p].get("Agility",0)
+                skill += proms[p].get("Stamina",0)+proms[p].get("Decision_Making_Speed",0)
+                return ofens + skill
+            # Mejor Tiki-Taka (control, pase, mental)
+            def score_tikitaka(p):
                 return (
-                    score_wildcard
+                    proms[p].get("First_Touch_Control",0) +
