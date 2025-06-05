@@ -9,7 +9,7 @@ import numpy as np
 st.set_page_config(page_title="Perfilador 5v5", page_icon="⚽", layout="wide")
 st.markdown("""
     <style>
-        body, .stApp { background-color: #669bbc !important; color: #003049; }
+        body, .stApp { background-color: #eeeeee !important; color: #003049; }
         h1, h2, h3, h4 { color: #c1121f !important; font-size: 1.4rem !important; }
         .small-title { font-size: 1.12rem !important; color: #003049 !important; }
         .emoji { font-size: 1.1rem !important; }
