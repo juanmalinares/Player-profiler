@@ -5,19 +5,7 @@ import os
 from itertools import combinations
 import numpy as np
 
-# Configuración visual
-st.set_page_config(page_title="Perfilador 5v5", layout="wide")
-st.markdown("""
-    <style>
-    body, .stApp, .css-18e3th9 { background-color: #F7F9FB; }
-    .cuadro { background: #00304911; border-radius: 14px; padding: 1.3em 1em 1em 1em; margin-bottom: 1.5em; }
-    .bigemoji { font-size: 1.7em !important; }
-    th, .stDataFrame { font-size: 15px !important; }
-    </style>
-""", unsafe_allow_html=True)
-
-ARCHIVO_DATOS = 'players.json'
-
+# ---- EMOJIS Y COMPARABLES ----
 EMOJI = {
     "Arquero":"🧤",
     "Muralla":"🛡️",
@@ -27,17 +15,21 @@ EMOJI = {
     "Topadora":"🚜"
 }
 
-# --- JUGADORES COMPARABLES POR ROL ---
 COMPARABLES = {
     "Arquero": ["Emiliano Martínez", "Iker Casillas"],
     "Gladiador": ["Arturo Vidal", "Gennaro Gattuso", "N'Golo Kanté"],
-    "Orquestador": ["Toni Kroos", "Juan Román Riquelme", "Andrea Pirlo"],
+    "Orquestador": ["Toni Kroos", "Andrea Pirlo", "Xavi Hernández"],
     "Wildcard": ["Ángel Di María", "Vinícius Jr", "Eden Hazard"],
     "Muralla": ["Walter Samuel", "Kalidou Koulibaly", "Paolo Maldini"],
     "Topadora":["Jude Bellingham", "Leon Goretzka", "Sergej Milinković-Savić"],
 }
 
-# --- FUNCIONES AUXILIARES DE DATOS ---
+ARCHIVO_DATOS = 'players.json'
+
+if 'editing' not in st.session_state:
+    st.session_state.editing = None
+
+# ---- FUNCIONES DE DATOS ----
 def cargar_datos():
     if os.path.exists(ARCHIVO_DATOS):
         with open(ARCHIVO_DATOS, 'r') as f:
@@ -76,6 +68,7 @@ ATRIBUTOS_CAMPO = [
     ("Defense_Transition",    "¿Qué tan bien transiciona de ataque a defensa?"),
     ("Spatial_Awareness",     "¿Qué tan buena es su conciencia del espacio libre alrededor?"),
 ]
+
 ATRIBUTOS_ARQUERO = [
     ("GK_Foot_Play",    "¿Qué tan habilidoso es jugando con los pies?"),
     ("GK_Agility",      "¿Qué tan ágil es para reaccionar a tiros y cambios de dirección?"),
@@ -84,83 +77,128 @@ ATRIBUTOS_ARQUERO = [
     ("GK_Positioning",  "¿Qué tan buena es su colocación y lectura de trayectorias?"),
     ("GK_Distribution", "¿Qué precisión tiene al distribuir balones largos y cortos?"),
 ]
+
 TIPOS_JUGADOR = ["Campo", "Arquero"]
 ATR_GK_CAMPO = ["GK_Foot_Play", "GK_Agility", "GK_Bravery"]
 
-# --- SCORING DE ROLES ---
-def score_muralla(a):
-    keys = ["Strength_in_Duels","Defense_Transition","Leadership_Presence","Recovery_Runs","Pressing_Consistency","Marking_Tightness","Tactical_Awareness"]
-    return sum([float(a.get(k,0)) for k in keys])
-def score_gladiador(a):
-    keys = ["Resilience_When_Behind","Composure","Strength_in_Duels","Stamina","Recovery_Runs","Pressing_Consistency","Marking_Tightness"]
-    return sum([float(a.get(k,0)) for k in keys])
-def score_orquestador(a):
-    keys = ["First_Touch_Control","Short_Passing_Accuracy","Vision_Free_Player","Ball_Retention","Tactical_Awareness","Balance","Decision_Making_Speed","Creativity","Leadership_Presence","Communication","Spatial_Awareness"]
-    return sum([float(a.get(k,0)) for k in keys])
+# --- SCORING REFINADO DE ROLES ---
 def score_wildcard(a):
-    off = sum([float(a.get(k,0)) for k in ["Acceleration","Dribbling_Efficiency","Power_Dribble_and_Score","Finishing_Precision","Attack_Transition"]])
-    lowdef = 15 - sum([float(a.get(k,0)) for k in ["Pressing_Consistency","Marking_Tightness","Recovery_Runs","Strength_in_Duels"]])
-    return off + lowdef
+    ataque = (
+        a.get("Finishing_Precision",0) +
+        a.get("Power_Dribble_and_Score",0) +
+        a.get("Attack_Transition",0) +
+        a.get("Dribbling_Efficiency",0) +
+        a.get("Agility",0)
+    )
+    defensa = (
+        a.get("Pressing_Consistency",0) +
+        a.get("Marking_Tightness",0) +
+        a.get("Strength_in_Duels",0) +
+        a.get("Defense_Transition",0) +
+        a.get("Recovery_Runs",0)
+    )
+    mental = (
+        a.get("Composure",0) +
+        a.get("Decision_Making_Speed",0) +
+        a.get("Leadership_Presence",0)
+    )
+    return ataque*2 - defensa - mental
+
+def score_gladiador(a):
+    return (
+        a.get("Resilience_When_Behind",0)*2 +
+        a.get("Composure",0) +
+        a.get("Strength_in_Duels",0)*2 +
+        a.get("Stamina",0)*2 +
+        a.get("Recovery_Runs",0)*2 +
+        a.get("Pressing_Consistency",0) +
+        a.get("Marking_Tightness",0)*2
+    )
+
 def score_topadora(a):
-    keys = ["Finishing_Precision","Creativity","First_Touch_Control","Short_Passing_Accuracy","Vision_Free_Player","Ball_Retention","Power_Dribble_and_Score","Decision_Making_Speed","Composure","Attack_Transition","Spatial_Awareness"]
-    return sum([float(a.get(k,0)) for k in keys])
+    ataque = (
+        a.get("Finishing_Precision",0) +
+        a.get("Power_Dribble_and_Score",0) +
+        a.get("Attack_Transition",0) +
+        a.get("Dribbling_Efficiency",0) +
+        a.get("Short_Passing_Accuracy",0) +
+        a.get("Ball_Retention",0) +
+        a.get("Creativity",0)
+    )
+    return ataque*2 + a.get("Leadership_Presence",0) + a.get("Vision_Free_Player",0) + a.get("Balance",0)
+
+def score_orquestador(a):
+    return (
+        a.get("First_Touch_Control",0)*2 +
+        a.get("Short_Passing_Accuracy",0)*2 +
+        a.get("Vision_Free_Player",0) +
+        a.get("Ball_Retention",0) +
+        a.get("Tactical_Awareness",0) +
+        a.get("Balance",0) +
+        a.get("Decision_Making_Speed",0) +
+        a.get("Creativity",0) +
+        a.get("Leadership_Presence",0) +
+        a.get("Communication",0) +
+        a.get("Spatial_Awareness",0)
+    )
+
+def score_muralla(a):
+    return (
+        a.get("Strength_in_Duels",0)*2 +
+        a.get("Defense_Transition",0)*2 +
+        a.get("Leadership_Presence",0) +
+        a.get("Recovery_Runs",0) +
+        a.get("Pressing_Consistency",0) +
+        a.get("Marking_Tightness",0)*2 +
+        a.get("Tactical_Awareness",0)
+    )
+
 def score_arquero(a):
-    keys = ["GK_Reaction","GK_Positioning","GK_Foot_Play","GK_Agility","GK_Bravery","GK_Distribution"]
-    return sum([float(a.get(k,0)) for k in keys])
+    return a.get("GK_Reaction",0)*2 + a.get("GK_Positioning",0) + a.get("GK_Foot_Play",0) + a.get("GK_Agility",0) + a.get("GK_Bravery",0) + a.get("GK_Distribution",0)
+
 ROLES = [
-    ("Muralla",score_muralla),
-    ("Gladiador",score_gladiador),
-    ("Orquestador",score_orquestador),
-    ("Wildcard",score_wildcard),
-    ("Topadora",score_topadora),
+    ("Arquero", score_arquero),
+    ("Muralla", score_muralla),
+    ("Gladiador", score_gladiador),
+    ("Orquestador", score_orquestador),
+    ("Wildcard", score_wildcard),
+    ("Topadora", score_topadora),
 ]
-def rol_primario(n, datos):
-    if datos[n]["Tipo"]=="Arquero": return "Arquero"
-    a = datos[n]["Atributos"]
-    scores = {rol:sc(a) for rol,sc in ROLES}
+
+# --- ROL PRIMARIO Y SECUNDARIO ---
+def rol_primario(nombre, datos):
+    info = datos[nombre]
+    if info["Tipo"]=="Arquero":
+        return "Arquero"
+    a = info["Atributos"]
+    scores = {rol:sc(a) for rol,sc in ROLES if rol!="Arquero"}
     return max(scores,key=scores.get)
-def rol_secundario(n, datos):
-    if datos[n]["Tipo"]=="Arquero": return ""
-    a = datos[n]["Atributos"]
-    scores = {rol:sc(a) for rol,sc in ROLES}
-    prim = max(scores,key=scores.get)
-    sec = sorted(scores.items(), key=lambda x: x[1], reverse=True)[1]
-    primv = scores[prim]
-    total = sum(scores.values())
-    if total == 0: return ""
-    return f"{sec[0]} ({int(100*sec[1]/total)}%)"
-def get_percent_rol(n, datos):
-    if datos[n]["Tipo"]=="Arquero": return "Arquero (100%)"
-    a = datos[n]["Atributos"]
-    scores = {rol:sc(a) for rol,sc in ROLES}
-    prim = max(scores,key=scores.get)
-    total = sum(scores.values())
-    if total == 0: return ""
-    return f"{prim} ({int(100*scores[prim]/total)}%)"
-def get_percent_roles(n, datos):
-    if datos[n]["Tipo"]=="Arquero": return "Arquero (100%)"
-    a = datos[n]["Atributos"]
-    scores = {rol:sc(a) for rol,sc in ROLES}
-    prim, sec = sorted(scores, key=scores.get, reverse=True)[:2]
-    total = sum(scores.values())
-    if total == 0: return ""
-    return f"{prim} ({int(100*scores[prim]/total)}%), {sec} ({int(100*scores[sec]/total)}%)"
+
+def rol_secundario(nombre, datos):
+    info = datos[nombre]
+    if info["Tipo"]=="Arquero":
+        return ""
+    a = info["Atributos"]
+    scores = {rol:sc(a) for rol,sc in ROLES if rol!="Arquero"}
+    sorted_scores = sorted(scores.items(), key=lambda x:x[1], reverse=True)
+    return sorted_scores[1][0] if len(sorted_scores)>1 else ""
+
+def porcentaje_roles(nombre, datos):
+    info = datos[nombre]
+    if info["Tipo"]=="Arquero":
+        return 100, 0
+    a = info["Atributos"]
+    scores = {rol:sc(a) for rol,sc in ROLES if rol!="Arquero"}
+    sorted_scores = sorted(scores.values(), reverse=True)
+    if len(sorted_scores) < 2 or sorted_scores[0]==0:
+        return 100, 0
+    p1 = int(100 * sorted_scores[0] / (sorted_scores[0]+sorted_scores[1]))
+    p2 = 100-p1
+    return p1, p2
 
 # --- DESCRIPCIÓN DE JUGADOR ---
-def descripcion_jugador(nombre, datos):
-    d = datos[nombre]
-    tipo = d["Tipo"]
-    a = d["Atributos"]
-    if tipo == "Arquero":
-        return (f"{nombre} es un arquero con reflejos {rango(a['GK_Reaction'])}, habilidad con los pies {rango(a['GK_Foot_Play'])} y "
-                f"posicionamiento {rango(a['GK_Positioning'])}. Destaca por su valentía ({rango(a['GK_Bravery'])}) y "
-                f"reparto de juego {rango(a['GK_Distribution'])}.")
-    # Campo:
-    rol = rol_primario(nombre, datos)
-    sec = rol_secundario(nombre, datos)
-    score_rol = get_percent_roles(nombre, datos)
-    base = f"{nombre} es principalmente un {rol.lower()} ({score_rol}). "
-    # Características según rol
+def descripcion_jugador(nombre, rol):
+    base = f"{nombre} es un jugador del tipo {rol} ({EMOJI.get(rol,'')}). "
     if rol == "Muralla":
         return base + "Imponente en defensa, fuerte físicamente, con buena recuperación y siempre dispuesto a frenar ataques rivales."
     elif rol == "Gladiador":
@@ -170,66 +208,69 @@ def descripcion_jugador(nombre, datos):
     elif rol == "Wildcard":
         return base + "Impredecible y desequilibrante, puede cambiar un partido en una jugada para bien o para mal."
     elif rol == "Topadora":
-        return base + "Potente llegada al área, combina pase y definición, mentalidad ofensiva y llegada. "
-    else:
-        return base + "Jugador de perfil equilibrado, versátil."
-def rango(val):
-    val = float(val)
-    if val >= 4: return "excelente"
-    if val >= 3: return "bueno"
-    if val >= 2: return "aceptable"
-    if val >= 1: return "limitado"
-    return "muy bajo"
+        return base + "Potente llegada al área, combina pase y definición, mentalidad ofensiva y llegada."
+    elif rol == "Arquero":
+        return base + "Seguro bajo los tres palos, buen juego de pies y grandes reflejos."
+    return base
 
-# --- INICIALIZACIÓN STREAMLIT ---
-if 'editing' not in st.session_state: st.session_state.editing = None
-
-# --- INTERFAZ ---
+# --- APP ---
 def main():
-    st.title("⚽ Perfilador 5v5 de Fútbol")
-    menu = st.columns([1,1,1])
-    opt = menu[0].button("Editar o agregar jugador")
-    opt2 = menu[1].button("Perfiles de jugadores")
-    opt3 = menu[2].button("Análisis")
-    # Manejo simple del menú
-    if not "seccion" in st.session_state:
-        st.session_state.seccion = "Editar o agregar jugador"
-    if opt: st.session_state.seccion = "Editar o agregar jugador"
-    if opt2: st.session_state.seccion = "Perfiles de jugadores"
-    if opt3: st.session_state.seccion = "Análisis"
+    st.set_page_config(page_title="Perfilador 5v5", layout="wide")
+    st.markdown(
+        """
+        <style>
+            body {background-color: #f5f6fa;}
+            .stApp {background-color: #f5f6fa;}
+            .titulo {font-size:1.5em; font-weight:700;}
+            .seccion {border:2px solid #669bbc; border-radius:1em; background:#f1f1f8; padding:1em 2em; margin-bottom:2em;}
+            .emoji {font-size:1.5em;}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
     datos = cargar_datos()
-    barra = st.sidebar
-    barra.header("Jugadores")
-    for n in datos:
-        em = EMOJI.get(rol_primario(n, datos), "❓")
-        cb = barra.checkbox(f"{em} {n}", value=datos[n].get("convocado", True), key=f"convocado_{n}")
-        datos[n]["convocado"] = cb
-    guardar_datos(datos)
+    menu = st.columns([1,1,1])
+    opcion = None
+    if menu[0].button("Editar o agregar jugador"):
+        opcion = "agregar"
+    elif menu[1].button("Perfiles de jugadores"):
+        opcion = "ver"
+    elif menu[2].button("Análisis"):
+        opcion = "analizar"
+    else:
+        opcion = "ver"
 
-    if st.session_state.seccion == "Editar o agregar jugador":
+    # --- AGREGAR / EDITAR JUGADOR ---
+    if opcion == "agregar":
         nombre_edit = st.session_state.editing
         es_edicion = nombre_edit is not None
+
         if es_edicion:
             st.header(f"Editando perfil de {nombre_edit}")
             tipo = datos[nombre_edit]["Tipo"]
         else:
             st.header("Agregar nuevo jugador")
             tipo = st.radio("Tipo de jugador:", TIPOS_JUGADOR)
+
         # Rotación arquero
         if tipo == "Arquero":
             rot_idx = 0
             if es_edicion:
                 rot_idx = 0 if datos[nombre_edit].get("GK_Rotacion", "Titular") == "Titular" else 1
             rot = st.selectbox("Arquero:", ["Titular", "Rotativo"], index=rot_idx)
+
         default_name = nombre_edit if es_edicion else ""
         nombre = st.text_input("Nombre del Jugador", value=default_name, key="player_name")
+
         if nombre:
             st.markdown("### Evalúa cada atributo (0–5)")
             attrs = {}
+
             for clave, preg in ATRIBUTOS_CAMPO:
                 default = datos[nombre_edit]["Atributos"].get(clave, 2) if es_edicion else 2
                 attrs[clave] = st.slider(preg, 0, 5, default, key=clave)
+
             if tipo == "Campo":
                 for clave in ATR_GK_CAMPO:
                     preg = dict(ATRIBUTOS_ARQUERO)[clave]
@@ -240,139 +281,84 @@ def main():
                     default = datos[nombre_edit]["Atributos"].get(clave, 2) if es_edicion else 2
                     attrs[clave] = st.slider(preg, 0, 5, default, key=clave)
                 attrs["GK_Rotacion"] = rot
+
             if st.button("Guardar Perfil"):
-                datos[nombre] = {"Tipo": tipo, "Atributos": attrs, "convocado": True}
+                datos[nombre] = {"Tipo": tipo, "Atributos": attrs}
                 if tipo == "Arquero":
                     datos[nombre]["GK_Rotacion"] = rot
                 guardar_datos(datos)
                 st.session_state.editing = None
                 st.success("Perfil guardado")
-                st.experimental_rerun()
+                return
         else:
             st.info("Ingresa un nombre para comenzar.")
-    elif st.session_state.seccion == "Perfiles de jugadores":
+
+    # --- PERFILES ---
+    elif opcion == "ver":
         st.header("Perfiles de Jugadores Guardados")
-        datos = cargar_datos()
-        convocados = [n for n in datos if datos[n].get("convocado", True)]
         if datos:
             filas = []
             for jug, info in datos.items():
                 fila = {"Nombre": jug, "Tipo": info["Tipo"]}
-                fila["Rol principal"] = rol_primario(jug, datos)
-                fila["Porcentajes"] = get_percent_roles(jug, datos)
+                rol = rol_primario(jug, datos)
+                sec = rol_secundario(jug, datos)
+                p1, p2 = porcentaje_roles(jug, datos)
+                fila["Rol Principal"] = f"{EMOJI[rol]} {rol} ({p1}%)"
+                fila["Rol Secundario"] = f"{EMOJI.get(sec,'')} {sec} ({p2}%)" if sec else ""
+                fila["Comparables"] = ", ".join(COMPARABLES.get(rol, []))
                 fila.update(info["Atributos"])
                 filas.append(fila)
             df = pd.DataFrame(filas).set_index("Nombre")
-            st.dataframe(df)
-            # Sección perfiles personalizados
-            st.markdown("### Perfiles de Jugador")
-            for n in datos:
-                st.markdown(f"**{n}**: {descripcion_jugador(n, datos)}")
-                if datos[n]["Tipo"] != "Arquero":
-                    comparables = COMPARABLES[rol_primario(n, datos)]
-                    st.caption(f"Jugadores comparables: {', '.join(comparables)}")
-                else:
-                    st.caption(f"Jugadores comparables: {', '.join(COMPARABLES['Arquero'])}")
-            st.write("---")
-            for jug in list(datos.keys()):
-                c1, c2, c3 = st.columns([6, 1, 1])
-                c1.write(jug)
-                if c2.button("✏️", key=f"edt_{jug}"):
-                    st.session_state.editing = jug
-                    st.session_state.seccion = "Editar o agregar jugador"
-                    st.experimental_rerun()
-                if c3.button("✖️", key=f"del_{jug}"):
-                    datos.pop(jug)
-                    guardar_datos(datos)
-                    st.experimental_rerun()
+            st.dataframe(df, use_container_width=True)
+
+            st.subheader("Descripciones individuales")
+            for jug in datos:
+                rol = rol_primario(jug, datos)
+                st.markdown(
+                    f"<div class='seccion'><span class='emoji'>{EMOJI.get(rol,'')}</span> <b>{jug}</b>: {descripcion_jugador(jug, rol)}</div>",
+                    unsafe_allow_html=True
+                )
         else:
             st.info("No hay perfiles aún. Añade un jugador primero.")
-    elif st.session_state.seccion == "Análisis":
-        st.header("Análisis de Equipos y Roles")
-        datos = cargar_datos()
-        convocados = [n for n in datos if datos[n].get("convocado", True)]
-        arqueros = [n for n in convocados if datos[n]["Tipo"]=="Arquero"]
-        nombres = [n for n in convocados if datos[n]["Tipo"]!="Arquero"]
-        proms = {p: datos[p]["Atributos"] for p in convocados}
-        # Top 3 por rol
-        st.subheader("🏅 Top 3 por Rol")
-        for rol, sc in ROLES + [("Topadora",score_topadora)]:
-            mejores = sorted([n for n in nombres if datos[n]["Tipo"]!="Arquero"], key=lambda n: sc(datos[n]["Atributos"]), reverse=True)[:3]
-            em = EMOJI.get(rol,"")
-            st.markdown(f"**{em} {rol}:** " + ", ".join(mejores))
-        # Mejor equipo 5-a-side: lógica igual que antes, solo roles nuevos
-        st.markdown("### 🏆 Mejor Equipo 5-a-side (Equilibrado)")
-        equipos = []
-        for combo in combinations(convocados, 5):
-            if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1:
-                continue
-            # Penalizar si hay más de un arquero
-            campo = [p for p in combo if datos[p]["Tipo"]!="Arquero"]
-            rolsc = [rol_primario(p, datos) for p in campo]
-            punt = (
-                score_muralla(datos[campo[0]]["Atributos"]) +
-                score_gladiador(datos[campo[1]]["Atributos"]) +
-                score_orquestador(datos[campo[2]]["Atributos"]) +
-                score_topadora(datos[campo[3]]["Atributos"]) +
-                score_wildcard(datos[campo[4]]["Atributos"])
+
+    # --- ANÁLISIS ---
+    elif opcion == "analizar":
+        st.header("Análisis de equipos y jugadores")
+        nombres = [n for n in datos if datos[n]["Tipo"] != "Arquero" or rol_primario(n, datos)=="Arquero"]
+        # Calcula promedios
+        proms = {}
+        for n in nombres:
+            proms[n] = datos[n]["Atributos"]
+
+        # Equipos/top roles
+        st.markdown("#### Top 3 por rol")
+        for rol, sc in ROLES:
+            if rol == "Arquero": continue
+            scores = sorted([(n, sc(proms[n])) for n in nombres if datos[n]["Tipo"]!="Arquero"], key=lambda x:x[1], reverse=True)
+            top = scores[:3]
+            st.markdown(f"**{EMOJI[rol]} {rol}:** " + ", ".join([f"{n} ({s})" for n,s in top]))
+
+        st.markdown("#### Mejor equipo 5-a-side")
+        if len(nombres)>=5:
+            best_score, best_team = -float('inf'), None
+            for combo in combinations(nombres, 5):
+                # Solo un arquero
+                if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1:
+                    continue
+                # Suma todos los scores de muralla, orquestador, wildcard, gladiador, topadora
+                equipo_score = (
+                    score_muralla(proms[combo[0]]) +
+                    score_orquestador(proms[combo[1]]) +
+                    score_wildcard(proms[combo[2]]) +
+                    score_gladiador(proms[combo[3]]) +
+                    score_topadora(proms[combo[4]])
+                )
+                if equipo_score > best_score:
+                    best_score, best_team = equipo_score, combo
+            st.markdown(
+                f"<div class='seccion'><b>Equipo óptimo:</b> {' | '.join([n for n in best_team])}</div>",
+                unsafe_allow_html=True
             )
-            equipos.append((punt,combo))
-        equipos = sorted(equipos, reverse=True)[:3]
-        for ix, (punt, combo) in enumerate(equipos,1):
-            st.markdown(f"<div class='cuadro'><b>Opción {ix}:</b> {' ,'.join(combo)}<br>Lógica: Un jugador por rol clave, maximiza equilibrio.</div>",unsafe_allow_html=True)
-        # Mejor equipo "Catenaccio"
-        st.markdown("### 🛡️ Mejor Catenaccio (Defensivo)")
-        equipos = []
-        for combo in combinations(convocados, 5):
-            if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1:
-                continue
-            campo = [p for p in combo if datos[p]["Tipo"]!="Arquero"]
-            punt = sum([score_muralla(datos[p]["Atributos"])+score_gladiador(datos[p]["Atributos"]) for p in campo])
-            equipos.append((punt,combo))
-        equipos = sorted(equipos, reverse=True)[:3]
-        for ix, (punt, combo) in enumerate(equipos,1):
-            st.markdown(f"<div class='cuadro'><b>Opción {ix}:</b> {' ,'.join(combo)}<br>Lógica: Jugadores más defensivos, máxima seguridad.</div>",unsafe_allow_html=True)
-        # Mejor equipo "Tiki Taka"
-        st.markdown("### 🎼 Mejor Tiki Taka (Control y posesión)")
-        equipos = []
-        for combo in combinations(convocados, 5):
-            if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1:
-                continue
-            campo = [p for p in combo if datos[p]["Tipo"]!="Arquero"]
-            punt = sum([score_orquestador(datos[p]["Atributos"]) for p in campo])
-            equipos.append((punt,combo))
-        equipos = sorted(equipos, reverse=True)[:3]
-        for ix, (punt, combo) in enumerate(equipos,1):
-            st.markdown(f"<div class='cuadro'><b>Opción {ix}:</b> {' ,'.join(combo)}<br>Lógica: Mejor manejo de balón y control mental.</div>",unsafe_allow_html=True)
-        # Mejor equipo "Contraataque"
-        st.markdown("### 🚀 Mejor Contraataque (Rápidos y ofensivos)")
-        equipos = []
-        for combo in combinations(convocados, 5):
-            if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1:
-                continue
-            campo = [p for p in combo if datos[p]["Tipo"]!="Arquero"]
-            punt = sum([score_wildcard(datos[p]["Atributos"])+score_topadora(datos[p]["Atributos"]) for p in campo])
-            equipos.append((punt,combo))
-        equipos = sorted(equipos, reverse=True)[:3]
-        for ix, (punt, combo) in enumerate(equipos,1):
-            st.markdown(f"<div class='cuadro'><b>Opción {ix}:</b> {' ,'.join(combo)}<br>Lógica: Maximiza potencial ofensivo, velocidad y verticalidad.</div>",unsafe_allow_html=True)
-        # Mejor equipo "Ruleta Rusa"
-        st.markdown("### 🎲 Mejor Ruleta Rusa (Mayor diferencia entre ataque/defensa/mental)")
-        equipos = []
-        def ruleta_score(p):
-            a = datos[p]["Atributos"]
-            ofens = sum([float(a.get(k,0)) for k in ["Finishing_Precision","Creativity","First_Touch_Control","Power_Dribble_and_Score"]])
-            defens = sum([float(a.get(k,0)) for k in ["Pressing_Consistency","Strength_in_Duels","Defense_Transition","Marking_Tightness"]])
-            ment = sum([float(a.get(k,0)) for k in ["Composure","Decision_Making_Speed"]])
-            return max(abs(ofens-defens), abs(ofens-ment), abs(ment-defens))
-        for combo in combinations(convocados, 5):
-            if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1: continue
-            campo = [p for p in combo if datos[p]["Tipo"]!="Arquero"]
-            punt = sum([ruleta_score(p) for p in campo])
-            equipos.append((punt,combo))
-        equipos = sorted(equipos, reverse=True)[:3]
-        for ix, (punt, combo) in enumerate(equipos,1):
-            st.markdown(f"<div class='cuadro'><b>Opción {ix}:</b> {' ,'.join(combo)}<br>Lógica: Más extremos/descompensados, potencial de genialidad y caos.</div>",unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
