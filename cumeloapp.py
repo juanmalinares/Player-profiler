@@ -213,7 +213,16 @@ def descripcion_jugador(nombre, rol):
         return base + "Seguro bajo los tres palos, buen juego de pies y grandes reflejos."
     return base
 
-# --- APP ---
+def sidebar_convocados(datos):
+    st.sidebar.markdown("## Convocados")
+    for nombre in datos:
+        rol = rol_primario(nombre, datos)
+        convocado = datos[nombre].get("Convocado", True)
+        nuevo_valor = st.sidebar.checkbox(f"{EMOJI.get(rol,'')} {nombre}", value=convocado, key=f"convocado_{nombre}")
+        datos[nombre]["Convocado"] = nuevo_valor
+    guardar_datos(datos)
+    st.sidebar.write("---")
+
 def main():
     st.set_page_config(page_title="Perfilador 5v5", layout="wide")
     st.markdown(
@@ -230,6 +239,8 @@ def main():
     )
 
     datos = cargar_datos()
+    sidebar_convocados(datos)  # Muestra sidebar SIEMPRE
+
     menu = st.columns([1,1,1])
     opcion = None
     if menu[0].button("Editar o agregar jugador"):
@@ -283,7 +294,7 @@ def main():
                 attrs["GK_Rotacion"] = rot
 
             if st.button("Guardar Perfil"):
-                datos[nombre] = {"Tipo": tipo, "Atributos": attrs}
+                datos[nombre] = {"Tipo": tipo, "Atributos": attrs, "Convocado": True}
                 if tipo == "Arquero":
                     datos[nombre]["GK_Rotacion"] = rot
                 guardar_datos(datos)
@@ -306,6 +317,7 @@ def main():
                 fila["Rol Principal"] = f"{EMOJI[rol]} {rol} ({p1}%)"
                 fila["Rol Secundario"] = f"{EMOJI.get(sec,'')} {sec} ({p2}%)" if sec else ""
                 fila["Comparables"] = ", ".join(COMPARABLES.get(rol, []))
+                fila["Convocado"] = info.get("Convocado", True)
                 fila.update(info["Atributos"])
                 filas.append(fila)
             df = pd.DataFrame(filas).set_index("Nombre")
@@ -324,8 +336,8 @@ def main():
     # --- ANÁLISIS ---
     elif opcion == "analizar":
         st.header("Análisis de equipos y jugadores")
-        nombres = [n for n in datos if datos[n]["Tipo"] != "Arquero" or rol_primario(n, datos)=="Arquero"]
-        # Calcula promedios
+        convocados = [n for n in datos if datos[n].get("Convocado", True)]
+        nombres = [n for n in convocados if datos[n]["Tipo"] != "Arquero" or rol_primario(n, datos)=="Arquero"]
         proms = {}
         for n in nombres:
             proms[n] = datos[n]["Atributos"]
@@ -342,23 +354,4 @@ def main():
         if len(nombres)>=5:
             best_score, best_team = -float('inf'), None
             for combo in combinations(nombres, 5):
-                # Solo un arquero
-                if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1:
-                    continue
-                # Suma todos los scores de muralla, orquestador, wildcard, gladiador, topadora
-                equipo_score = (
-                    score_muralla(proms[combo[0]]) +
-                    score_orquestador(proms[combo[1]]) +
-                    score_wildcard(proms[combo[2]]) +
-                    score_gladiador(proms[combo[3]]) +
-                    score_topadora(proms[combo[4]])
-                )
-                if equipo_score > best_score:
-                    best_score, best_team = equipo_score, combo
-            st.markdown(
-                f"<div class='seccion'><b>Equipo óptimo:</b> {' | '.join([n for n in best_team])}</div>",
-                unsafe_allow_html=True
-            )
-
-if __name__ == "__main__":
-    main()
+                if sum(1 for p in combo if datos[p]['Tipo'] ==
