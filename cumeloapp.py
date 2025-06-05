@@ -144,7 +144,6 @@ def obtener_usuario():
     if not st.session_state["usuario"]:
         st.sidebar.warning("Debes ingresar un nombre de usuario para votar o editar jugadores.")
         # Allow viewing profiles and analysis even without username
-        # st.stop() would halt everything.
         return None # Return None if no user, so other functions can check
     return st.session_state["usuario"]
 
@@ -158,14 +157,22 @@ def promedio_atributos(votaciones):
         return {}
         
     df = pd.DataFrame(valid_votes)
-    return df.mean(axis=0).to_dict()
+    if df.empty:
+        return {}
+
+    # Select only columns with numeric data types before calculating the mean
+    numeric_cols_df = df.select_dtypes(include=np.number)
+    
+    if numeric_cols_df.empty: # No numeric columns found or left
+        return {}
+        
+    return numeric_cols_df.mean(axis=0).to_dict()
 
 def obtener_rol(promedio_attrs):
     pr = promedio_attrs # shorthand
     if not pr: return "Orquestador", {"Orquestador": 1.0} # Default if no attributes
 
     # Check for Arquero type based on GK_Reaction first
-    # This allows a "Campo" player with high GK_Reaction to be identified as a potential GK
     if pr.get("GK_Reaction", 0) >= 3:
         return "Arquero", {"Arquero": 1.0}
 
@@ -230,16 +237,10 @@ def obtener_rol(promedio_attrs):
         "Topadora": score_topadora
     }
     
-    # Normalize scores for distribution
-    # Only consider positive scores for role determination strength
-    # sum_abs_scores = sum(abs(s) for s in roles.values()) # Original way
     sum_positive_scores = sum(max(0,s) for s in roles.values())
 
-    if sum_positive_scores == 0: # If all field roles scores are zero or negative
-        # Default to 'Orquestador' or a generic role if no clear field role emerges
-        # This can happen for an Arquero with low GK_Reaction and no positive field attributes.
-        # Or for a field player whose attributes average out to non-positive scores for all defined roles.
-        rol_princ = "Orquestador" # Fallback role
+    if sum_positive_scores == 0: 
+        rol_princ = "Orquestador" 
         dist = {role: (1.0 if role == rol_princ else 0.0) for role in roles}
     else:
         dist = {k: (max(0, v) / sum_positive_scores) for k, v in roles.items()}
@@ -263,16 +264,13 @@ def descripcion_jugador(rol):
 def render_sidebar(datos, usuario):
     st.sidebar.title("⚽ Menú")
     
-    # Allow menu selection even if user is not set for viewing purposes
     menu_options = ["Perfiles de jugadores", "Análisis"]
-    if usuario: # Only allow adding/editing if user is set
+    if usuario: 
         menu_options.insert(0, "Agregar o editar jugador")
 
-    # Initialize session state for menu if not present
     if 'menu_selection' not in st.session_state:
         st.session_state.menu_selection = menu_options[0] if menu_options else "Perfiles de jugadores"
 
-    # Ensure current selection is valid
     if st.session_state.menu_selection not in menu_options:
          st.session_state.menu_selection = menu_options[0] if menu_options else "Perfiles de jugadores"
 
@@ -282,26 +280,22 @@ def render_sidebar(datos, usuario):
     st.sidebar.markdown("---")
     st.sidebar.markdown("#### Jugadores Convocados")
     
-    # Create a temporary dictionary to track changes in convocados status
-    # to avoid modifying 'datos' directly during iteration if it causes issues with Streamlit's flow.
-    # However, direct modification is usually fine with st.checkbox and immediate rerun.
     convocados_changed = False
     for nombre_jugador, info_jugador in datos.items():
         proms = promedio_atributos(info_jugador.get(KEY_VOTACIONES, {}))
         rol, _ = obtener_rol(proms)
         es_convocado = info_jugador.get(KEY_CONVOCADO, True)
-        emoji_rol = EMOJI.get(rol, "👤") # Default emoji
+        emoji_rol = EMOJI.get(rol, "👤") 
         
         checkbox_label = f"{emoji_rol} {nombre_jugador}"
         new_convocado_status = st.sidebar.checkbox(checkbox_label, value=es_convocado, key=f"convoc_{nombre_jugador}")
         
-        if datos[nombre_jugador][KEY_CONVOCADO] != new_convocado_status:
+        if datos[nombre_jugador].get(KEY_CONVOCADO, True) != new_convocado_status: # Check before assignment
             datos[nombre_jugador][KEY_CONVOCADO] = new_convocado_status
             convocados_changed = True
             
     if convocados_changed:
         guardar_datos(datos)
-        # No need to rerun explicitly, checkbox interaction does it.
     return menu
 
 def render_add_edit_player_page(datos, usuario):
@@ -315,12 +309,11 @@ def render_add_edit_player_page(datos, usuario):
     
     atributos_actuales = {}
     
-    # Display current average as reference if player exists, or defaults for new player
     player_data = datos.get(nombre_jugador)
     existing_ratings_for_user = {}
     if player_data and usuario in player_data.get(KEY_VOTACIONES, {}):
         existing_ratings_for_user = player_data[KEY_VOTACIONES][usuario]
-    elif player_data: # Player exists, but not rated by this user, show average.
+    elif player_data: 
         existing_ratings_for_user = promedio_atributos(player_data.get(KEY_VOTACIONES, {}))
 
 
@@ -328,23 +321,22 @@ def render_add_edit_player_page(datos, usuario):
     st.subheader("Atributos de Campo")
     for attr_key, attr_question in ATRIBUTOS_CAMPO:
         default_value = existing_ratings_for_user.get(attr_key, 2)
-        atributos_actuales[attr_key] = st.slider(attr_question, 0, 5, default_value, key=f"{nombre_jugador}_{attr_key}")
+        atributos_actuales[attr_key] = st.slider(attr_question, 0, 5, int(default_value), key=f"{nombre_jugador}_{attr_key}")
 
     st.markdown("---")
     if tipo_jugador == TIPO_CAMPO:
         st.subheader("Atributos Adicionales (Estilo Portero para Jugador de Campo)")
-        # ATRIBUTOS_ARQUERO_dict for quick lookup
         dict_atributos_arquero = dict(ATRIBUTOS_ARQUERO)
-        for attr_key in ATR_GK_CAMPO: # e.g. GK_Foot_Play, GK_Agility, GK_Bravery
+        for attr_key in ATR_GK_CAMPO: 
             question = dict_atributos_arquero.get(attr_key, attr_key.replace("_", " "))
             default_value = existing_ratings_for_user.get(attr_key, 2)
-            atributos_actuales[attr_key] = st.slider(question, 0, 5, default_value, key=f"{nombre_jugador}_{attr_key}_gk_campo")
+            atributos_actuales[attr_key] = st.slider(question, 0, 5, int(default_value), key=f"{nombre_jugador}_{attr_key}_gk_campo")
     
     elif tipo_jugador == TIPO_ARQUERO:
         st.subheader("Atributos de Arquero")
         for attr_key, attr_question in ATRIBUTOS_ARQUERO:
             default_value = existing_ratings_for_user.get(attr_key, 2)
-            atributos_actuales[attr_key] = st.slider(attr_question, 0, 5, default_value, key=f"{nombre_jugador}_{attr_key}_arquero")
+            atributos_actuales[attr_key] = st.slider(attr_question, 0, 5, int(default_value), key=f"{nombre_jugador}_{attr_key}_arquero")
 
     if st.button("💾 Guardar/Actualizar Jugador"):
         if not nombre_jugador:
@@ -355,12 +347,11 @@ def render_add_edit_player_page(datos, usuario):
             datos[nombre_jugador] = {
                 KEY_TIPO: tipo_jugador,
                 KEY_VOTACIONES: {},
-                KEY_CONVOCADO: True # Default new players to convocado
+                KEY_CONVOCADO: True 
             }
         
-        datos[nombre_jugador][KEY_TIPO] = tipo_jugador # Update type if changed for existing player
+        datos[nombre_jugador][KEY_TIPO] = tipo_jugador 
         datos[nombre_jugador][KEY_VOTACIONES][usuario] = atributos_actuales
-        # Ensure convocado status is preserved or set if it was somehow missing
         if KEY_CONVOCADO not in datos[nombre_jugador]:
             datos[nombre_jugador][KEY_CONVOCADO] = True
 
@@ -380,11 +371,10 @@ def render_player_profiles_page(datos):
         proms = promedio_atributos(info_jugador.get(KEY_VOTACIONES, {}))
         rol_principal, distribucion_roles = obtener_rol(proms)
         
-        # Sort roles by strength for secondary role display
         roles_ordenados = sorted(distribucion_roles.items(), key=lambda item: item[1], reverse=True)
         
         rol_secundario_str = "N/A"
-        if len(roles_ordenados) > 1 and roles_ordenados[1][1] > 0: # Check if there's a meaningful secondary role
+        if len(roles_ordenados) > 1 and roles_ordenados[1][1] > 0.001: # check for meaningful secondary role
             rol_sec = roles_ordenados[1][0]
             pct_sec = roles_ordenados[1][1] * 100
             rol_secundario_str = f"{rol_sec} ({pct_sec:.0f}%)"
@@ -396,25 +386,62 @@ def render_player_profiles_page(datos):
             "Descripción": descripcion_jugador(rol_principal),
             "Comparables": ", ".join(COMPARABLES.get(rol_principal, ["N/A"]))
         }
-        # Add all field attributes to the profile data for the DataFrame
+        
+        # Determine which attribute set to display based on primary role or player type
+        # For simplicity, show all defined field attributes, and GK if player is GK type or GK role
+        
+        displayed_attributes = {}
         for attr_key, _ in ATRIBUTOS_CAMPO:
-            perfil_data[attr_key] = round(proms.get(attr_key, 0), 1)
-        # Add goalkeeper attributes if primary role is Arquero
-        if rol_principal == TIPO_ARQUERO:
-             for attr_key, _ in ATRIBUTOS_ARQUERO:
-                perfil_data[attr_key] = round(proms.get(attr_key, 0), 1)
+            displayed_attributes[attr_key] = round(proms.get(attr_key, 0), 1)
+        
+        # If player's designated type is Arquero or their role is Arquero, show GK attributes
+        if info_jugador.get(KEY_TIPO) == TIPO_ARQUERO or rol_principal == TIPO_ARQUERO:
+            for attr_key, _ in ATRIBUTOS_ARQUERO:
+                 displayed_attributes[attr_key] = round(proms.get(attr_key, 0), 1)
+        elif info_jugador.get(KEY_TIPO) == TIPO_CAMPO: # For field players, also show their rated GK_CAMPO attributes
+            for attr_key in ATR_GK_CAMPO:
+                 displayed_attributes[attr_key] = round(proms.get(attr_key, 0), 1)
 
 
+        perfil_data.update(displayed_attributes)
         perfiles_lista.append(perfil_data)
 
     if perfiles_lista:
         df_perfiles = pd.DataFrame(perfiles_lista).fillna(0)
         
-        # Select and order columns for display
         column_order = ["Nombre", "Rol principal", "Rol secundario", "Descripción", "Comparables"]
-        # Add attribute columns (field first, then GK if any Arqueros shown)
-        attribute_cols_ordered = [col for col in df_perfiles.columns if col not in column_order]
-        final_column_order = column_order + sorted(list(set(attribute_cols_ordered))) # sorted unique attributes
+        
+        # Get all unique attribute keys present in the generated profiles
+        all_attribute_keys_in_data = set()
+        for p in perfiles_lista:
+            for k in p.keys():
+                if k not in column_order:
+                    all_attribute_keys_in_data.add(k)
+        
+        # Order these attributes: first ATRIBUTOS_CAMPO keys, then ATRIBUTOS_ARQUERO keys
+        # This ensures a somewhat logical order if both types of attributes are present.
+        
+        sorted_attribute_cols = []
+        # Add field attributes that are in the data
+        for attr_key, _ in ATRIBUTOS_CAMPO:
+            if attr_key in all_attribute_keys_in_data:
+                sorted_attribute_cols.append(attr_key)
+        # Add GK attributes that are in the data and not already added (e.g. from ATR_GK_CAMPO)
+        for attr_key, _ in ATRIBUTOS_ARQUERO:
+            if attr_key in all_attribute_keys_in_data and attr_key not in sorted_attribute_cols:
+                sorted_attribute_cols.append(attr_key)
+        # Add any remaining attributes from ATR_GK_CAMPO if not covered (should be by above)
+        for attr_key in ATR_GK_CAMPO:
+             if attr_key in all_attribute_keys_in_data and attr_key not in sorted_attribute_cols:
+                sorted_attribute_cols.append(attr_key)
+
+
+        final_column_order = column_order + sorted_attribute_cols
+        
+        # Ensure all columns in final_column_order actually exist in df_perfiles, or add them with 0
+        for col in final_column_order:
+            if col not in df_perfiles.columns:
+                df_perfiles[col] = 0
 
         st.dataframe(df_perfiles[final_column_order], use_container_width=True)
         
@@ -455,32 +482,31 @@ def render_team_analysis_page(datos):
         score_total = 0
         for jugador_nombre in equipo:
             if jugador_nombre in promedios_jugadores:
-                # Sum all numerical attribute values for the player
                 score_total += sum(val for val in promedios_jugadores[jugador_nombre].values() if isinstance(val, (int, float)))
         return score_total
 
     posibles_equipos_5v5 = []
-    for combo_campo in combinations(jugadores_campo_convocados, 4):
-        for arquero in arqueros_convocados:
-            equipo_actual = list(combo_campo) + [arquero]
-            score = calcular_score_equipo_general(equipo_actual, promedios_convocados)
-            posibles_equipos_5v5.append((score, equipo_actual))
+    if len(jugadores_campo_convocados) >=4 and arqueros_convocados: # Ensure we can form a team
+        for combo_campo in combinations(jugadores_campo_convocados, 4):
+            for arquero in arqueros_convocados:
+                equipo_actual = list(combo_campo) + [arquero]
+                score = calcular_score_equipo_general(equipo_actual, promedios_convocados)
+                posibles_equipos_5v5.append((score, equipo_actual))
     
-    # Sort teams by score descending, show top 3
     mejores_equipos_5v5 = sorted(posibles_equipos_5v5, key=lambda x: x[0], reverse=True)[:3]
 
     st.markdown("#### 🏆 Mejores Equipos 5v5 (Basado en Suma General de Atributos)")
     if mejores_equipos_5v5:
         for i, (puntaje, equipo) in enumerate(mejores_equipos_5v5):
             nombres_equipo_str = " | ".join(equipo)
-            # Highlight the goalkeeper
-            for gk in arqueros_convocados:
-                if gk in nombres_equipo_str:
-                    nombres_equipo_str = nombres_equipo_str.replace(gk, f"🧤{gk}")
+            for gk in arqueros_convocados: # Highlight GKs in the list
+                if gk in nombres_equipo_str: # Simple check
+                    nombres_equipo_str = nombres_equipo_str.replace(gk, f"🧤{EMOJI.get('Arquero','')}{gk}")
+
 
             st.markdown(f"<div class='highlight'><b>Equipo {i+1}</b>: {nombres_equipo_str} <br> Puntuación Total: {puntaje:.1f}</div>", unsafe_allow_html=True)
     else:
-        st.info("No se pudieron generar equipos. Verifica las condiciones de los jugadores.")
+        st.info("No se pudieron generar equipos. Verifica las convocatorias y tipos de jugadores.")
     
     st.caption("Lógica de Puntuación: Suma de todos los atributos promediados de los jugadores convocados en el equipo.")
     st.markdown("---")
@@ -490,9 +516,8 @@ def render_team_analysis_page(datos):
 # --- Lógica Principal ---
 def main():
     datos_jugadores = cargar_datos()
-    usuario_actual = obtener_usuario() # Can be None if not entered
+    usuario_actual = obtener_usuario() 
 
-    # Sidebar renders first and returns the selected menu option
     menu_seleccionado = render_sidebar(datos_jugadores, usuario_actual)
 
     if menu_seleccionado == "Agregar o editar jugador":
