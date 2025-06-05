@@ -60,7 +60,13 @@ ATR_GK_CAMPO = ["GK_Foot_Play", "GK_Agility", "GK_Bravery"]
 def aplicar_estilos_css():
     st.markdown("""
         <style>
-        body, .stApp { background-color: #eeeeee; color: #333333; }
+        body, .stApp {
+            background-color: #f8f9fa;
+            color: #212529;
+            font-family: "Helvetica", "Arial", sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+        }
         .css-18e3th9, .st-emotion-cache-18e3th9 { background-color: #003049; } 
         .css-18e3th9 *, .st-emotion-cache-18e3th9 * { color: #e8e8e8; } 
         .css-18e3th9 .stRadio label, .st-emotion-cache-18e3th9 .stRadio label,
@@ -81,16 +87,33 @@ def aplicar_estilos_css():
             color: #c1121f;
         }
 
-        .stDataFrame { background-color: #003049; color: #fff;}
-        h1, h2, h3, h4, h5 { color: #c1121f; font-size: 1.25em; margin-bottom: 0.25em;}
-        .highlight {background: #669bbc22; border-radius: 10px; padding: 0.7em 1em; margin-bottom:1.2em; color: #333333; border: 1px solid #669bbc44;}
-        .stRadio > label { font-size: 1.1em; color: #333333 !important; display: flex; align-items: center; margin-bottom: 0.5rem;}
-        .stRadio > label > div > span { color: #333333 !important; }
-        .stTextInput label, .stSlider label, .stSelectbox label, .stMultiselect label { color: #333333 !important; }
+        .stDataFrame { background-color: #e9ecef; color: #212529;}
+        h1 { color: #c1121f; font-size: 1.8em; margin-bottom: 0.4em; }
+        h2 { color: #c1121f; font-size: 1.6em; margin-bottom: 0.3em; }
+        h3 { color: #c1121f; font-size: 1.4em; margin-bottom: 0.3em; }
+        h4 { color: #c1121f; font-size: 1.2em; margin-bottom: 0.2em; }
+        h5 { color: #c1121f; font-size: 1.1em; margin-bottom: 0.2em; }
+        .highlight {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 0.7em 1em;
+            margin-bottom: 1.2em;
+            color: #212529;
+            border: 1px solid #ced4da;
+        }
+        .stRadio > label {
+            font-size: 1.1em;
+            color: #212529 !important;
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .stRadio > label > div > span { color: #212529 !important; }
+        .stTextInput label, .stSlider label, .stSelectbox label, .stMultiselect label { color: #212529 !important; }
         .stButton>button {border-radius: 0.5rem; border: 1px solid #003049; color: #003049; padding: 0.5em 1em;} /* Botones principales */
         .stButton>button:hover {border-color: #c1121f; color: #c1121f;}
         .stButton>button:focus:not(:active) {border-color: #c1121f; color: #c1121f; box-shadow: 0 0 0 0.2rem rgba(193, 18, 31, 0.25);}
-        .stCheckbox > label > div > span { color: #333333 !important; }
+        .stCheckbox > label > div > span { color: #212529 !important; }
         </style>
     """, unsafe_allow_html=True)
 
