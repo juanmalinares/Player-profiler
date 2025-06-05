@@ -140,8 +140,39 @@ def score_ruletarusa(attrs):
     diff = max(scores) - min(scores)
     return diff
 
+# ============ CSS DARK THEME & COLORES ============
+def dark_css():
+    st.markdown("""
+        <style>
+        html, body, [class*="css"]  {
+            background-color: #003049 !important;
+        }
+        h1, h2, h3 {
+            color: #c1121f !important;
+            font-size: 1.5rem !important;
+            margin-top: 0.6em !important;
+            margin-bottom: 0.2em !important;
+        }
+        .stMarkdown, .stText, .stDataFrame, .stTable, .st-bw, .st-c8, .stSelectbox label, .stRadio label {
+            color: #f7f7ff !important;
+        }
+        .stButton>button {
+            background-color: #c1121f;
+            color: #fff;
+            font-weight: bold;
+            border-radius: 6px;
+        }
+        .st-bw, .st-c8 {color: #669bbc !important;}
+        .stCheckbox, .stRadio {color: #c1121f !important;}
+        .css-10trblm {color: #669bbc !important;}
+        .st-emotion-cache-ocqkz7 {background-color: #003049 !important;}
+        .sidebar .sidebar-content {background-color: #212939 !important;}
+        </style>
+        """, unsafe_allow_html=True)
+
 # ================ MAIN STREAMLIT ================
 def main():
+    dark_css()
     st.title("Perfilador de Jugadores 5v5 – Colaborativo, Roles y Equipos Especiales")
 
     usuario = st.sidebar.text_input("Tu nombre (anónimo en la interfaz)", value=st.session_state.get("usuario", ""))
@@ -253,7 +284,7 @@ def main():
                 ("Ruleta Rusa", score_ruletarusa),
             ]:
                 top3 = sorted(nombres, key=lambda p: fun(proms[p]), reverse=True)[:3]
-                st.markdown(f"**Top 3 {rol}:** {' | '.join(top3)}")
+                st.markdown(f"<span style='color:#669bbc; font-size:1.1rem;'><b>Top 3 {rol}:</b> {' | '.join(top3)}</span>", unsafe_allow_html=True)
 
             # MEJOR EQUIPO (uno por rol)
             equipo = []
@@ -270,7 +301,7 @@ def main():
                 pick = max(disponibles, key=lambda p: fun(proms[p]))
                 equipo.append(f"{pick} ({rol})")
                 usados.add(pick)
-            st.markdown(f"**Mejor Equipo 5-a-side (Roles nuevos):** {', '.join(equipo)}")
+            st.markdown(f"<span style='color:#c1121f; font-size:1.2rem;'><b>Mejor Equipo 5-a-side (Roles nuevos):</b> {', '.join(equipo)}</span>", unsafe_allow_html=True)
 
             # Equipos especiales
             def score_cat(p):
@@ -282,46 +313,4 @@ def main():
                 )
             def score_contra(p):
                 return (
-                    score_wildcard(proms[p]) + proms[p].get("Acceleration",0) + proms[p].get("Attack_Transition",0) +
-                    proms[p].get("First_Touch_Control",0) + proms[p].get("Short_Passing_Accuracy",0) +
-                    proms[p].get("Finishing_Precision",0) + proms[p].get("Dribbling_Efficiency",0) +
-                    proms[p].get("Power_Dribble_and_Score",0) + proms[p].get("Agility",0) +
-                    proms[p].get("Stamina",0) + proms[p].get("Decision_Making_Speed",0)
-                )
-            def score_tikitaka(p):
-                return (
-                    score_orquestador(proms[p]) + proms[p].get("Ball_Retention",0) +
-                    proms[p].get("Short_Passing_Accuracy",0) + proms[p].get("Creativity",0) +
-                    proms[p].get("Decision_Making_Speed",0) + proms[p].get("Composure",0) +
-                    proms[p].get("Communication",0) + proms[p].get("Vision_Free_Player",0) +
-                    proms[p].get("Spatial_Awareness",0)
-                )
-            def score_ruleta(p):
-                return score_ruletarusa(proms[p])
-
-            def best_team(fun, nombre):
-                best, best_score = None, -1
-                for combo in combinations(nombres, 5):
-                    # busca uno solo que sea arquero
-                    if sum(
-                        1 for p in combo if any(
-                            isinstance(v, dict) and v.get("Tipo", "") == "Arquero"
-                            for v in datos[p].values() if isinstance(v, dict)
-                        )
-                    ) != 1:
-                        continue
-                    s = sum(fun(p) for p in combo)
-                    if s > best_score:
-                        best_score, best = s, combo
-                if best:
-                    st.markdown(f"**{nombre}:** {', '.join(best)}")
-
-            best_team(score_cat, "Mejor Catenaccio (Defensivo)")
-            best_team(score_contra, "Mejor Contraataque")
-            best_team(score_tikitaka, "Mejor Tiki Taka")
-            best_team(score_ruleta, "Mejor Ruleta Rusa (desbalanceados)")
-
-    barra.write(f"**Jugadores:** {len(datos)}")
-
-if __name__ == "__main__":
-    main()
+                    score_wildcard
