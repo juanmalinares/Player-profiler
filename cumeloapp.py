@@ -28,6 +28,8 @@ ARCHIVO_DATOS = 'players.json'
 
 if 'editing' not in st.session_state:
     st.session_state.editing = None
+if 'page' not in st.session_state:
+    st.session_state.page = "agregar"
 
 # ---- FUNCIONES DE DATOS ----
 def cargar_datos():
@@ -214,7 +216,15 @@ def descripcion_jugador(nombre, rol):
     return base
 
 def sidebar_convocados(datos):
-    st.sidebar.markdown("## Convocados")
+    st.sidebar.markdown("## Menú")
+    if st.sidebar.button("Editar o agregar jugador"):
+        st.session_state.page = "agregar"
+    if st.sidebar.button("Perfiles de jugadores"):
+        st.session_state.page = "ver"
+    if st.sidebar.button("Análisis"):
+        st.session_state.page = "analizar"
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("## Jugadores convocados")
     for nombre in datos:
         rol = rol_primario(nombre, datos)
         convocado = datos[nombre].get("Convocado", True)
@@ -223,12 +233,24 @@ def sidebar_convocados(datos):
     guardar_datos(datos)
     st.sidebar.write("---")
 
+def mejores_equipos_por_categoria(nombres, datos, proms, score_funcs, descripcion):
+    equipos = []
+    for combo in combinations(nombres, 5):
+        if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1:
+            continue
+        team_score = sum([f(proms[p]) for f, p in zip(score_funcs, combo)])
+        equipos.append((team_score, combo))
+    equipos = sorted(equipos, reverse=True)[:3]
+    cuadros = []
+    for i, (score, eq) in enumerate(equipos):
+        cuadros.append(f"**Equipo #{i+1}:** {' | '.join(eq)}  \nPuntaje: {score:.1f}  \n_{descripcion}_")
+    return cuadros
+
 def main():
     st.set_page_config(page_title="Perfilador 5v5", layout="wide")
     st.markdown(
         """
         <style>
-            body {background-color: #f5f6fa;}
             .stApp {background-color: #f5f6fa;}
             .titulo {font-size:1.5em; font-weight:700;}
             .seccion {border:2px solid #669bbc; border-radius:1em; background:#f1f1f8; padding:1em 2em; margin-bottom:2em;}
@@ -241,30 +263,19 @@ def main():
     datos = cargar_datos()
     sidebar_convocados(datos)  # Muestra sidebar SIEMPRE
 
-    menu = st.columns([1,1,1])
-    opcion = None
-    if menu[0].button("Editar o agregar jugador"):
-        opcion = "agregar"
-    elif menu[1].button("Perfiles de jugadores"):
-        opcion = "ver"
-    elif menu[2].button("Análisis"):
-        opcion = "analizar"
-    else:
-        opcion = "ver"
+    opcion = st.session_state.page
 
     # --- AGREGAR / EDITAR JUGADOR ---
     if opcion == "agregar":
         nombre_edit = st.session_state.editing
         es_edicion = nombre_edit is not None
 
+        st.header("Agregar o editar jugador")
         if es_edicion:
-            st.header(f"Editando perfil de {nombre_edit}")
             tipo = datos[nombre_edit]["Tipo"]
         else:
-            st.header("Agregar nuevo jugador")
             tipo = st.radio("Tipo de jugador:", TIPOS_JUGADOR)
 
-        # Rotación arquero
         if tipo == "Arquero":
             rot_idx = 0
             if es_edicion:
@@ -306,7 +317,7 @@ def main():
 
     # --- PERFILES ---
     elif opcion == "ver":
-        st.header("Perfiles de Jugadores Guardados")
+        st.header("Perfiles de jugadores")
         if datos:
             filas = []
             for jug, info in datos.items():
@@ -328,44 +339,98 @@ def main():
                 rol = rol_primario(jug, datos)
                 st.markdown(
                     f"<div class='seccion'><span class='emoji'>{EMOJI.get(rol,'')}</span> <b>{jug}</b>: {descripcion_jugador(jug, rol)}</div>",
-                    unsafe_allow_html=True
+                    unsafe_allow_html=True,
                 )
         else:
-            st.info("No hay perfiles aún. Añade un jugador primero.")
+            st.info("No hay perfiles aún.")
 
-    # --- ANÁLISIS ---
+    # --- ANÁLISIS DE EQUIPOS ---
     elif opcion == "analizar":
-        st.header("Análisis de equipos y jugadores")
-        convocados = [n for n in datos if datos[n].get("Convocado", True)]
-        nombres = [n for n in convocados if datos[n]["Tipo"] != "Arquero" or rol_primario(n, datos)=="Arquero"]
-        proms = {}
-        for n in nombres:
-            proms[n] = datos[n]["Atributos"]
+        st.header("Análisis de equipos y categorías")
+        nombres = [n for n,info in datos.items() if info.get("Convocado", True)]
+        proms = {p: datos[p]["Atributos"] for p in nombres}
 
-        # Equipos/top roles
-        st.markdown("#### Top 3 por rol")
-        for rol, sc in ROLES:
-            if rol == "Arquero": continue
-            scores = sorted([(n, sc(proms[n])) for n in nombres if datos[n]["Tipo"]!="Arquero"], key=lambda x:x[1], reverse=True)
-            top = scores[:3]
-            st.markdown(f"**{EMOJI[rol]} {rol}:** " + ", ".join([f"{n} ({s})" for n,s in top]))
+        if len(nombres) < 5:
+            st.warning("Convoca al menos 5 jugadores.")
+            return
 
-        st.markdown("#### Mejor equipo 5-a-side")
-        if len(nombres)>=5:
-            best_score, best_team = -float('inf'), None
-            for combo in combinations(nombres, 5):
-                if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1:
-                    continue
-                team_score = sum(
-                    score_wildcard(proms[combo[0]]) +
-                    score_gladiador(proms[combo[1]]) +
-                    score_orquestador(proms[combo[2]]) +
-                    score_topadora(proms[combo[3]]) +
-                    score_muralla(proms[combo[4]])
-                )
-                if team_score > best_score:
-                    best_score, best_team = team_score, combo
-            st.markdown(f"<div class='seccion'><b>Equipo óptimo:</b> {' | '.join([n for n in best_team])}</div>", unsafe_allow_html=True)
+        # Mejor equipo 5v5
+        equipos = []
+        for combo in combinations(nombres, 5):
+            if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1:
+                continue
+            score_team = (
+                score_arquero(proms[combo[0]]) +
+                score_muralla(proms[combo[1]]) +
+                score_gladiador(proms[combo[2]]) +
+                score_orquestador(proms[combo[3]]) +
+                score_topadora(proms[combo[4]])
+            )
+            equipos.append((score_team, combo))
+        equipos = sorted(equipos, reverse=True)[:3]
+        st.markdown(f"<div class='seccion'><b>🏆 Top 3: Mejor equipo 5v5</b><br/>" + "<br/>".join([f"**Equipo #{i+1}:** {' | '.join(eq)} (Puntaje: {s:.1f})" for i,(s,eq) in enumerate(equipos)]) + "</div>", unsafe_allow_html=True)
+
+        # Especiales
+        # Catenaccio: Muralla, Gladiador y defensivos
+        equipos_cat = []
+        for combo in combinations(nombres, 5):
+            if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1:
+                continue
+            score = sum([
+                score_arquero(proms[combo[0]]),
+                score_muralla(proms[combo[1]]),
+                score_gladiador(proms[combo[2]]),
+                score_muralla(proms[combo[3]]),
+                score_gladiador(proms[combo[4]]),
+            ])
+            equipos_cat.append((score, combo))
+        equipos_cat = sorted(equipos_cat, reverse=True)[:3]
+        st.markdown(f"<div class='seccion'><b>🛡️ Top 3: Mejor Catenaccio (equipo defensivo)</b><br/>" + "<br/>".join([f"**Equipo #{i+1}:** {' | '.join(eq)} (Puntaje: {s:.1f})" for i,(s,eq) in enumerate(equipos_cat)]) + "</div>", unsafe_allow_html=True)
+
+        # Contraataque: Wildcard, Topadora, Attack_Transition, Acceleration
+        equipos_counter = []
+        for combo in combinations(nombres, 5):
+            if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1:
+                continue
+            score = (
+                score_arquero(proms[combo[0]]) +
+                score_topadora(proms[combo[1]]) +
+                score_wildcard(proms[combo[2]]) +
+                score_topadora(proms[combo[3]]) +
+                score_wildcard(proms[combo[4]])
+            )
+            equipos_counter.append((score, combo))
+        equipos_counter = sorted(equipos_counter, reverse=True)[:3]
+        st.markdown(f"<div class='seccion'><b>🚀 Top 3: Mejor contraataque (rápidos y ofensivos)</b><br/>" + "<br/>".join([f"**Equipo #{i+1}:** {' | '.join(eq)} (Puntaje: {s:.1f})" for i,(s,eq) in enumerate(equipos_counter)]) + "</div>", unsafe_allow_html=True)
+
+        # Tiki-Taka: Orquestador, Topadora, Creativity, Decision_Making, etc
+        equipos_tiki = []
+        for combo in combinations(nombres, 5):
+            if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1:
+                continue
+            score = (
+                score_arquero(proms[combo[0]]) +
+                score_orquestador(proms[combo[1]]) +
+                score_topadora(proms[combo[2]]) +
+                score_orquestador(proms[combo[3]]) +
+                score_topadora(proms[combo[4]])
+            )
+            equipos_tiki.append((score, combo))
+        equipos_tiki = sorted(equipos_tiki, reverse=True)[:3]
+        st.markdown(f"<div class='seccion'><b>🎼 Top 3: Mejor tiki-taka (posesión y control)</b><br/>" + "<br/>".join([f"**Equipo #{i+1}:** {' | '.join(eq)} (Puntaje: {s:.1f})" for i,(s,eq) in enumerate(equipos_tiki)]) + "</div>", unsafe_allow_html=True)
+
+        # Ruleta rusa: equipos con más diferencia entre ataque y defensa
+        equipos_ruleta = []
+        for combo in combinations(nombres, 5):
+            if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1:
+                continue
+            team = [proms[p] for p in combo]
+            atk = sum([score_wildcard(p) for p in team])
+            dfs = sum([score_gladiador(p) + score_muralla(p) for p in team])
+            ruleta_score = abs(atk - dfs)
+            equipos_ruleta.append((ruleta_score, combo))
+        equipos_ruleta = sorted(equipos_ruleta, reverse=True)[:3]
+        st.markdown(f"<div class='seccion'><b>🎲 Top 3: Mejor ruleta rusa (equipo más impredecible)</b><br/>" + "<br/>".join([f"**Equipo #{i+1}:** {' | '.join(eq)} (Puntaje: {s:.1f})" for i,(s,eq) in enumerate(equipos_ruleta)]) + "</div>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
