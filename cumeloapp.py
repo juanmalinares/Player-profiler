@@ -29,7 +29,7 @@ COMPARABLES = {
     "Topadora": ["Jude Bellingham", "Leon Goretzka", "Sergej Milinković-Savić"],
 }
 
-ATRIBUTOS_CAMPO = [
+ATRIBUTOS_CAMPO_DEF = [ # Definición global para referencia
     ("First_Touch_Control", "Control del primer toque"),("Short_Passing_Accuracy","Precisión de pases cortos (<5 m)"),
     ("Vision_Free_Player", "Visión para encontrar compañeros libres"),("Finishing_Precision", "Precisión al definir ocasiones de gol"),
     ("Dribbling_Efficiency", "Eficiencia de regate en espacios reducidos"),("Power_Dribble_and_Score","Prob. de regatear a 3 y marcar"),
@@ -44,12 +44,14 @@ ATRIBUTOS_CAMPO = [
     ("Attack_Transition", "Transición de defensa a ataque"),("Defense_Transition", "Transición de ataque a defensa"),
     ("Spatial_Awareness", "Conciencia del espacio libre alrededor"),
 ]
-
-ATRIBUTOS_ARQUERO = [
+ATRIBUTOS_ARQUERO_DEF = [ # Definición global
     ("GK_Foot_Play", "Habilidad con los pies"), ("GK_Agility", "Agilidad para reaccionar"),
     ("GK_Reaction", "Rapidez de reacción en paradas"), ("GK_Bravery", "Valentía en duelos y disparos"),
     ("GK_Positioning", "Colocación y lectura de trayectorias"), ("GK_Distribution", "Precisión en distribución"),
 ]
+# Crear diccionarios para búsqueda rápida de nombres descriptivos
+ATTR_DISPLAY_NAMES = dict(ATRIBUTOS_CAMPO_DEF + ATRIBUTOS_ARQUERO_DEF)
+
 
 TIPOS_JUGADOR = [TIPO_CAMPO, TIPO_ARQUERO]
 ATR_GK_CAMPO = ["GK_Foot_Play", "GK_Agility", "GK_Bravery"]
@@ -58,22 +60,23 @@ def aplicar_estilos_css():
     st.markdown("""
         <style>
         body, .stApp { background-color: #eeeeee; color: #333333; }
-        .css-18e3th9, .st-emotion-cache-18e3th9 { background-color: #003049; }
-        .css-18e3th9 *, .st-emotion-cache-18e3th9 * { color: #e8e8e8; }
+        .css-18e3th9, .st-emotion-cache-18e3th9 { background-color: #003049; } /* Sidebar */
+        .css-18e3th9 *, .st-emotion-cache-18e3th9 * { color: #e8e8e8; } /* Texto en Sidebar */
         .css-18e3th9 .stRadio label, .st-emotion-cache-18e3th9 .stRadio label,
         .css-18e3th9 .stCheckbox label, .st-emotion-cache-18e3th9 .stCheckbox label {
-             color: #e8e8e8 !important;
+             color: #e8e8e8 !important; /* Forzar color en widgets de sidebar */
         }
         .stDataFrame { background-color: #003049; color: #fff;}
         h1, h2, h3, h4, h5 { color: #c1121f; font-size: 1.25em; margin-bottom: 0.25em;}
         .highlight {background: #669bbc22; border-radius: 10px; padding: 0.7em 1em; margin-bottom:1.2em; color: #333333; border: 1px solid #669bbc44;}
-        .stRadio > label { font-size: 1.1em; color: #333333 !important; /* Ensure main area radio labels are dark */ display: flex; align-items: center; margin-bottom: 0.5rem;}
-        .stRadio > label > div > span { color: #333333 !important; } /* Text part of radio */
+        /* Estilos para widgets en el área principal para asegurar legibilidad en fondo claro */
+        .stRadio > label { font-size: 1.1em; color: #333333 !important; display: flex; align-items: center; margin-bottom: 0.5rem;}
+        .stRadio > label > div > span { color: #333333 !important; }
         .stTextInput label, .stSlider label, .stSelectbox label, .stMultiselect label { color: #333333 !important; }
         .stButton>button {border-radius: 0.5rem; border: 1px solid #003049; color: #003049; padding: 0.5em 1em;}
         .stButton>button:hover {border-color: #c1121f; color: #c1121f;}
         .stButton>button:focus:not(:active) {border-color: #c1121f; color: #c1121f; box-shadow: 0 0 0 0.2rem rgba(193, 18, 31, 0.25);}
-        .stCheckbox > label > div > span { color: #333333 !important; /* For main area checkbox labels */}
+        .stCheckbox > label > div > span { color: #333333 !important; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -130,7 +133,7 @@ def obtener_rol(pr, tipo_jugador=TIPO_CAMPO):
         "Orquestador": pr.get("Vision_Free_Player",0)*2.5 + pr.get("Short_Passing_Accuracy",0)*2.5 + pr.get("Creativity",0)*2 + pr.get("Decision_Making_Speed",0)*1.5 + pr.get("First_Touch_Control",0)*1.5 + pr.get("Spatial_Awareness",0)*1.5 + pr.get("Tactical_Awareness",0)*1 + pr.get("Composure",0)*1 + pr.get("Ball_Retention",0)*0.5,
         "Topadora": pr.get("Power_Dribble_and_Score",0)*2 + pr.get("Finishing_Precision",0)*1.5 + pr.get("Acceleration",0)*1.5 + pr.get("Strength_in_Duels",0)*1 + pr.get("Attack_Transition",0)*1 + pr.get("Ball_Retention",0)*0.5
     }
-    valid_scores = {k: v for k, v in scores.items() if v is not None} # Ensure no None values from pr.get if default not specified
+    valid_scores = {k: v for k, v in scores.items() if v is not None} 
     sum_pos = sum(max(0,s) for s in valid_scores.values())
     
     if not valid_scores or sum_pos == 0: return "Orquestador", {"Orquestador": 1.0}
@@ -224,12 +227,11 @@ def render_sidebar(datos_jug, user_name):
     st.sidebar.markdown(f"Usuario: **{user_name}**")
     st.sidebar.markdown("---")
     opts = ["Agregar o editar jugador", "Perfiles de jugadores", "Análisis"]
-    # Asegurar que el índice sea válido si las opciones cambian o el estado es viejo.
     current_selection_index = 0
     if 'menu_selection' in st.session_state and st.session_state.menu_selection in opts:
         current_selection_index = opts.index(st.session_state.menu_selection)
     else:
-        st.session_state.menu_selection = opts[0] # Default si no es válido
+        st.session_state.menu_selection = opts[0] 
 
     menu = st.sidebar.radio("Selecciona opción:", opts, index=current_selection_index, key="main_menu_radio")
     st.session_state.menu_selection = menu
@@ -238,7 +240,6 @@ def render_sidebar(datos_jug, user_name):
     changed = False
     for name in sorted(datos_jug.keys()):
         info = datos_jug[name]
-        # Se pasa el tipo de jugador a obtener_rol
         proms = promedio_atributos(info.get(KEY_VOTACIONES, {}))
         rol, _ = obtener_rol(proms, info.get(KEY_TIPO, TIPO_CAMPO))
         conv = info.get(KEY_CONVOCADO, True)
@@ -254,13 +255,16 @@ def render_sidebar(datos_jug, user_name):
 
 def render_add_edit_player_page(datos, usuario):
     st.header("Editar o agregar jugador")
-    nombre_key = "nombre_jugador_input_ae" # Define key fuera del text_input para usarla después
     
-    # Usar st.session_state para el valor del input de nombre de jugador
-    if nombre_key not in st.session_state:
-        st.session_state[nombre_key] = ""
+    # Clave única para el input de nombre, se inicializa en session_state si no existe.
+    nombre_key_session = "nombre_jugador_input_ae_current" 
+    if nombre_key_session not in st.session_state:
+        st.session_state[nombre_key_session] = ""
 
-    nombre_jugador = st.text_input("Nombre del jugador", key=nombre_key).strip() # No más value=st.session_state.get()
+    nombre_jugador = st.text_input("Nombre del jugador", 
+                                   value=st.session_state[nombre_key_session], 
+                                   key=nombre_key_session + "_widget" # Key diferente para el widget mismo
+                                  ).strip() 
     
     tipo_idx = 0
     if nombre_jugador and nombre_jugador in datos and datos[nombre_jugador].get(KEY_TIPO) == TIPO_ARQUERO: tipo_idx = 1
@@ -269,7 +273,7 @@ def render_add_edit_player_page(datos, usuario):
     attrs_actuales = {}
     player_data = datos.get(nombre_jugador)
     ratings = {}
-    caption_text = f"{nombre_jugador} aún no tiene valoraciones."
+    caption_text = f"{nombre_jugador if nombre_jugador else 'Nuevo Jugador'} aún no tiene valoraciones (o no existe)."
     if player_data:
         if usuario in player_data.get(KEY_VOTACIONES, {}):
             ratings = player_data[KEY_VOTACIONES][usuario]
@@ -277,48 +281,58 @@ def render_add_edit_player_page(datos, usuario):
         else:
             ratings = promedio_atributos(player_data.get(KEY_VOTACIONES, {}))
             if ratings: caption_text = f"Mostrando valoraciones promedio para {nombre_jugador} (aún no has votado)."
+            else: caption_text = f"{nombre_jugador} no tiene valoraciones promedio. Establece las iniciales."
+    elif nombre_jugador: # El jugador no existe en 'datos' pero se ha ingresado un nombre
+        caption_text = f"Agregando nuevo jugador: {nombre_jugador}. Establece sus atributos."
+
+
     st.caption(caption_text)
 
     st.markdown("---"); st.subheader("Atributos de Campo")
-    for k,q in ATRIBUTOS_CAMPO: attrs_actuales[k] = st.slider(q,0,5,int(round(ratings.get(k,2))),key=f"{nombre_key}_{k}_s_{nombre_jugador}") # Add nombre_jugador to key
+    for k,q in ATRIBUTOS_CAMPO_DEF: attrs_actuales[k] = st.slider(q,0,5,int(round(ratings.get(k,2))),key=f"slider_{nombre_jugador}_{k}")
     st.markdown("---")
     if tipo_jugador == TIPO_CAMPO:
         st.subheader("Atributos Adicionales (Portero para Jugador de Campo)")
-        d_aq_atr = dict(ATRIBUTOS_ARQUERO)
-        for k in ATR_GK_CAMPO: attrs_actuales[k] = st.slider(d_aq_atr.get(k,k.replace("_"," ")),0,5,int(round(ratings.get(k,2))),key=f"{nombre_key}_{k}_gkc_s_{nombre_jugador}")
+        d_aq_atr = dict(ATRIBUTOS_ARQUERO_DEF)
+        for k in ATR_GK_CAMPO: attrs_actuales[k] = st.slider(d_aq_atr.get(k,k.replace("_"," ")),0,5,int(round(ratings.get(k,2))),key=f"slider_{nombre_jugador}_{k}_gkc")
     elif tipo_jugador == TIPO_ARQUERO:
         st.subheader("Atributos de Arquero")
-        for k,q in ATRIBUTOS_ARQUERO: attrs_actuales[k] = st.slider(q,0,5,int(round(ratings.get(k,2))),key=f"{nombre_key}_{k}_aq_s_{nombre_jugador}")
+        for k,q in ATRIBUTOS_ARQUERO_DEF: attrs_actuales[k] = st.slider(q,0,5,int(round(ratings.get(k,2))),key=f"slider_{nombre_jugador}_{k}_aq")
 
     if st.button("💾 Guardar/Actualizar Jugador", key="save_player_btn_ae"):
-        if not nombre_jugador: st.error("El nombre del jugador no puede estar vacío."); return
+        current_nombre_ingresado = st.session_state[nombre_key_session].strip() # Tomar el valor actual del input
+        if not current_nombre_ingresado: 
+            st.error("El nombre del jugador no puede estar vacío.")
+            return
         
-        # Crear entrada si no existe
-        if nombre_jugador not in datos: 
-            datos[nombre_jugador] = {KEY_TIPO: tipo_jugador, KEY_VOTACIONES:{}, KEY_CONVOCADO:True}
+        # Usar el nombre ingresado en el momento del click para guardar
+        nombre_a_guardar = current_nombre_ingresado
         
-        # Actualizar tipo y votaciones
-        datos[nombre_jugador][KEY_TIPO] = tipo_jugador
-        if KEY_VOTACIONES not in datos[nombre_jugador] or not isinstance(datos[nombre_jugador].get(KEY_VOTACIONES),dict): 
-            datos[nombre_jugador][KEY_VOTACIONES]={}
-        datos[nombre_jugador][KEY_VOTACIONES][usuario] = attrs_actuales
-        if KEY_CONVOCADO not in datos[nombre_jugador]: 
-            datos[nombre_jugador][KEY_CONVOCADO] = True
+        if nombre_a_guardar not in datos: 
+            datos[nombre_a_guardar] = {KEY_TIPO: tipo_jugador, KEY_VOTACIONES:{}, KEY_CONVOCADO:True}
+        
+        datos[nombre_a_guardar][KEY_TIPO] = tipo_jugador
+        if KEY_VOTACIONES not in datos[nombre_a_guardar] or not isinstance(datos[nombre_a_guardar].get(KEY_VOTACIONES),dict): 
+            datos[nombre_a_guardar][KEY_VOTACIONES]={}
+        datos[nombre_a_guardar][KEY_VOTACIONES][usuario] = attrs_actuales
+        if KEY_CONVOCADO not in datos[nombre_a_guardar]: 
+            datos[nombre_a_guardar][KEY_CONVOCADO] = True
         
         guardar_datos(datos)
-        st.success(f"¡Jugador '{nombre_jugador}' guardado/actualizado con tus valoraciones!")
+        st.success(f"¡Jugador '{nombre_a_guardar}' guardado/actualizado con tus valoraciones!")
         st.balloons()
-        # Para limpiar el input después de guardar:
-        st.session_state[nombre_key] = "" # Actualiza el session_state
-        st.rerun() # Fuerza un rerun para que el text_input se actualice con el valor vacío.
+        
+        # Limpiar el campo de nombre en session_state para el siguiente jugador
+        st.session_state[nombre_key_session] = "" 
+        st.rerun()
 
 def render_player_profiles_page(datos):
     st.header("Perfiles de jugadores")
     if not datos: st.info("No hay jugadores registrados."); return
     perfiles = []
     for name in sorted(datos.keys()):
-        info_jugador = datos[name] # CORRECCIÓN: Asignar info_jugador aquí
-        proms = promedio_atributos(info_jugador.get(KEY_VOTACIONES,{})) # Usar info_jugador
+        info_jugador = datos[name]
+        proms = promedio_atributos(info_jugador.get(KEY_VOTACIONES,{})) 
         rol, dist = obtener_rol(proms, info_jugador.get(KEY_TIPO, TIPO_CAMPO))
         roles_ord = sorted(dist.items(), key=lambda item:item[1], reverse=True)
         rol_sec_str = "N/A"
@@ -327,7 +341,7 @@ def render_player_profiles_page(datos):
         perfil = {"Nombre":f"{EMOJI.get(rol,'👤')} {name}", "Rol principal":rol, "Rol secundario":rol_sec_str, 
                   "Descripción":descripcion_jugador(rol), "Comparables":", ".join(COMPARABLES.get(rol,["N/A"]))}
         
-        all_attr_keys = [k for k,_ in ATRIBUTOS_CAMPO] + [k for k,_ in ATRIBUTOS_ARQUERO]
+        all_attr_keys = [k for k,_ in ATRIBUTOS_CAMPO_DEF] + [k for k,_ in ATRIBUTOS_ARQUERO_DEF] # Usar DEF
         for attr_k in all_attr_keys: perfil[attr_k] = round(proms.get(attr_k,0),1)
         perfiles.append(perfil)
 
@@ -338,7 +352,12 @@ def render_player_profiles_page(datos):
         final_cols = cols_disp + attr_cols
         for c in final_cols: 
             if c not in df_p.columns: df_p[c]=0.0
-        st.dataframe(df_p[final_cols].astype(str).replace(r'\.0$', '', regex=True).replace('0', '-'), use_container_width=True) # Reemplazar 0 con -
+        # Reemplazar ceros con guiones y quitar ".0"
+        df_display = df_p[final_cols].copy()
+        for col in attr_cols: # Solo para columnas de atributos
+            df_display[col] = df_display[col].apply(lambda x: '-' if x == 0 else f"{x:.1f}".replace('.0',''))
+
+        st.dataframe(df_display, use_container_width=True)
         st.markdown("---"); st.markdown("### Descripciones Detalladas y Comparables")
         for p_info in perfiles:
             st.markdown(f"**{p_info['Nombre']} ({p_info['Rol principal']})**: {p_info['Descripción']}")
@@ -369,20 +388,19 @@ def generar_analisis_texto(nombre_equipo_seleccionado, equipo_seleccionado_nombr
     if numeric_df_team_attrs.empty: return "Los atributos del equipo seleccionado no son numéricos para el análisis."
     team_avg_attrs = numeric_df_team_attrs.mean().to_dict()
 
-    sobreindexa_text = "Este equipo sobreindexa en: "
-    highlights = []
+    # SOBREINDEXACIÓN
+    sobreindexa_items = []
     for attr, team_val in team_avg_attrs.items():
         global_val = promedios_globales_todos_jugadores.get(attr, 0)
+        attr_nombre_display = ATTR_DISPLAY_NAMES.get(attr, attr)
         if global_val > 0.5 and team_val > global_val * 1.15: 
-            attr_nombre_display = next((nombre_display for clave, nombre_display in ATRIBUTOS_CAMPO + ATRIBUTOS_ARQUERO if clave == attr), attr)
-            highlights.append(f"{attr_nombre_display} ({team_val:.1f} vs prom. global {global_val:.1f})")
+            sobreindexa_items.append(f"{attr_nombre_display} ({team_val:.1f} vs prom. global {global_val:.1f})")
         elif team_val > 4.0 and global_val < 3.5 :
-             attr_nombre_display = next((nombre_display for clave, nombre_display in ATRIBUTOS_CAMPO + ATRIBUTOS_ARQUERO if clave == attr), attr)
-             highlights.append(f"{attr_nombre_display} ({team_val:.1f}, destacado)")
+             sobreindexa_items.append(f"{attr_nombre_display} ({team_val:.1f}, destacado globalmente)")
     
-    if highlights: sobreindexa_text += ", ".join(highlights) + "."
-    else: sobreindexa_text = "El equipo muestra un perfil equilibrado sin una sobreindexación clara en atributos específicos comparado al promedio general."
+    sobreindexa_text = "\n".join([f"* {item}" for item in sobreindexa_items]) if sobreindexa_items else "* El equipo muestra un perfil equilibrado sin una sobreindexación clara en atributos específicos comparado al promedio general."
 
+    # MEJOR ESTILO
     arquero_sel = None
     for nombre_jugador in equipo_seleccionado_nombres:
         if datos_completos_todos_jugadores.get(nombre_jugador, {}).get(KEY_TIPO) == TIPO_ARQUERO:
@@ -399,24 +417,31 @@ def generar_analisis_texto(nombre_equipo_seleccionado, equipo_seleccionado_nombr
     mejor_estilo_nombre = max(scores_estilos, key=scores_estilos.get)
     mejor_estilo_text = f"El mejor estilo de juego para '{nombre_equipo_seleccionado}' parece ser: **{mejor_estilo_nombre}** (Puntaje: {scores_estilos[mejor_estilo_nombre]:.1f})."
 
+    # PUNTOS FUERTES
     sorted_team_attrs = sorted(team_avg_attrs.items(), key=lambda item: item[1], reverse=True)
-    puntos_fuertes_text = "Puntos Fuertes Destacados: "
-    top_attrs = [f"{next((d for k,d in ATRIBUTOS_CAMPO+ATRIBUTOS_ARQUERO if k==clave), clave).split('(')[0].strip()} ({v:.1f})" for clave,v in sorted_team_attrs[:3] if v > 3.0]
-    if top_attrs: puntos_fuertes_text += ", ".join(top_attrs) + "."
-    else: puntos_fuertes_text += "No se identifican puntos fuertes dominantes basados en atributos individuales muy altos."
+    puntos_fuertes_items = [f"{ATTR_DISPLAY_NAMES.get(clave, clave)} ({v:.1f})" for clave,v in sorted_team_attrs[:3] if v > 3.0] # Top 3 si son > 3.0
+    if not puntos_fuertes_items: puntos_fuertes_items.append("No se identifican puntos fuertes dominantes basados en atributos individuales muy altos.")
     roles_presentes_str = ", ".join(set(roles_equipo_sel.values()))
-    puntos_fuertes_text += f" La combinación de roles ({roles_presentes_str}) puede ser una ventaja."
+    puntos_fuertes_items.append(f"Combinación de roles: {roles_presentes_str}.")
+    puntos_fuertes_text = "\n".join([f"* {item}" for item in puntos_fuertes_items])
 
-    puntos_debiles_text = "Áreas de Posible Mejora: "
-    bottom_attrs = [f"{next((d for k,d in ATRIBUTOS_CAMPO+ATRIBUTOS_ARQUERO if k==clave), clave).split('(')[0].strip()} ({v:.1f})" for clave,v in sorted_team_attrs[-3:] if v < 2.5]
-    if bottom_attrs: puntos_debiles_text += ", ".join(bottom_attrs) + "."
-    else: puntos_debiles_text += "El equipo no muestra debilidades críticas obvias en atributos individuales."
+    # PUNTOS DÉBILES
+    puntos_debiles_items = [f"{ATTR_DISPLAY_NAMES.get(clave, clave)} ({v:.1f})" for clave,v in sorted_team_attrs[-3:] if v < 2.5] # Bottom 3 si son < 2.5
+    if not puntos_debiles_items: puntos_debiles_items.append("El equipo no muestra debilidades críticas obvias en atributos individuales.")
+    puntos_debiles_text = "\n".join([f"* {item}" for item in puntos_debiles_items])
 
     return f"""### Análisis del Equipo: {nombre_equipo_seleccionado}
-**Sobreindexación y Perfil General:** {sobreindexa_text}
-**Estilo de Juego Sugerido:** {mejor_estilo_text}
-**Puntos Fuertes:** {puntos_fuertes_text}
-**Puntos Débiles Potenciales:** {puntos_debiles_text}"""
+**Sobreindexación y Perfil General:**
+{sobreindexa_text}
+
+**Estilo de Juego Sugerido:**
+{mejor_estilo_text}
+
+**Puntos Fuertes:**
+{puntos_fuertes_text}
+
+**Puntos Débiles Potenciales:**
+{puntos_debiles_text}"""
 
 def render_team_analysis_page(datos_jugadores_todos):
     st.header("Análisis de equipos y compatibilidades")
@@ -426,39 +451,44 @@ def render_team_analysis_page(datos_jugadores_todos):
     convocados_para_seleccion = {n: i for n, i in datos_jugadores_todos.items() if i.get(KEY_CONVOCADO, False)}
     if not convocados_para_seleccion:
         st.info("No hay jugadores convocados para seleccionar. Marca jugadores como convocados en la barra lateral.")
-        # Si queremos que la sección de análisis automático se muestre incluso si esta parte no puede, no usamos st.stop()
-    else: # Solo mostrar selectores si hay jugadores convocados
+    else: 
         arqueros_opciones = {n:f"{EMOJI.get(obtener_rol(promedio_atributos(i.get(KEY_VOTACIONES, {})), TIPO_ARQUERO)[0], '👤')} {n}" for n,i in convocados_para_seleccion.items() if i.get(KEY_TIPO)==TIPO_ARQUERO}
         campo_opciones = {n:f"{EMOJI.get(obtener_rol(promedio_atributos(i.get(KEY_VOTACIONES, {})), TIPO_CAMPO)[0], '👤')} {n}" for n,i in convocados_para_seleccion.items() if i.get(KEY_TIPO)==TIPO_CAMPO}
 
         lista_nombres_arqueros = list(arqueros_opciones.keys())
         if st.session_state.custom_gk_select and st.session_state.custom_gk_select not in lista_nombres_arqueros:
-            st.session_state.custom_gk_select = None
+            st.session_state.custom_gk_select = None if lista_nombres_arqueros else None # Si no hay arqueros, None
+        
         st.session_state.custom_gk_select = st.selectbox(
-            "Selecciona 1 Arquero:", options=[None] + lista_nombres_arqueros, 
-            format_func=lambda x: "---" if x is None else arqueros_opciones.get(x, x),
+            "Selecciona 1 Arquero:", options=([None] if not lista_nombres_arqueros else [None] + lista_nombres_arqueros), # Manejar lista vacía
+            format_func=lambda x: "--- Elige un arquero ---" if x is None else arqueros_opciones.get(x, x),
+            index=0, # Para que "---" sea el default si None es la primera opción
             key="selectbox_custom_gk"
         )
 
         lista_nombres_campo = list(campo_opciones.keys())
-        st.session_state.custom_field_select = [p for p in st.session_state.custom_field_select if p in lista_nombres_campo]
+        # Filtrar selecciones previas si los jugadores ya no están disponibles
+        current_field_selection = [p for p in st.session_state.custom_field_select if p in lista_nombres_campo]
+        if len(current_field_selection) > 5: # Asegurar que no exceda el nuevo límite
+            current_field_selection = current_field_selection[:5]
+        
         st.session_state.custom_field_select = st.multiselect(
-            "Selecciona 4 Jugadores de Campo:", options=lista_nombres_campo,
-            default=st.session_state.custom_field_select,
+            "Selecciona 5 Jugadores de Campo:", options=lista_nombres_campo, # CAMBIO: 5 jugadores
+            default=current_field_selection,
             format_func=lambda x: campo_opciones.get(x,x),
-            key="multiselect_custom_field", max_selections=4
+            key="multiselect_custom_field", max_selections=5 # CAMBIO: max_selections=5
         )
         
         nombre_equipo_manual = st.text_input("Nombre para tu equipo (opcional):", 
                                              value=st.session_state.nombre_equipo_manual_input, 
                                              key="text_input_nombre_equipo_manual").strip()
-        st.session_state.nombre_equipo_manual_input = nombre_equipo_manual # Guardar el valor actual
-        if not nombre_equipo_manual: nombre_equipo_manual_display = "Equipo Seleccionado"
-        else: nombre_equipo_manual_display = nombre_equipo_manual
+        st.session_state.nombre_equipo_manual_input = nombre_equipo_manual 
+        nombre_equipo_manual_display = nombre_equipo_manual if nombre_equipo_manual else "Equipo Seleccionado"
 
 
         if st.button("⚡ Analizar Equipo Seleccionado", key="analizar_equipo_manual_btn"):
-            if st.session_state.custom_gk_select and len(st.session_state.custom_field_select) == 4:
+            # CAMBIO: Validar 1 arquero y 5 de campo
+            if st.session_state.custom_gk_select and len(st.session_state.custom_field_select) == 5:
                 equipo_nombres = [st.session_state.custom_gk_select] + st.session_state.custom_field_select
                 proms_eq_sel = {n: promedio_atributos(datos_jugadores_todos[n].get(KEY_VOTACIONES,{})) for n in equipo_nombres if n in datos_jugadores_todos}
                 roles_eq_sel = {n: obtener_rol(proms_eq_sel[n], datos_jugadores_todos[n].get(KEY_TIPO, TIPO_CAMPO))[0] for n in equipo_nombres if n in proms_eq_sel}
@@ -468,12 +498,11 @@ def render_team_analysis_page(datos_jugadores_todos):
                 else: 
                     analisis_txt = generar_analisis_texto(nombre_equipo_manual_display, equipo_nombres, proms_eq_sel, roles_eq_sel, proms_globales, datos_jugadores_todos)
                     st.markdown(analisis_txt)
-            else: st.warning("Por favor, selecciona 1 arquero y 4 jugadores de campo.")
+            else: st.warning("Por favor, selecciona 1 arquero y 5 jugadores de campo para analizar.") # CAMBIO: Mensaje
     
     st.markdown("---")
     
-    # --- Sección de Análisis Automático de Equipos por Categoría/Estilo ---
-    st.subheader("🌟 Mejores Combinaciones de Equipos (Automático)")
+    st.subheader("🌟 Mejores Combinaciones de Equipos (Automático - 5v5)") # Sigue siendo 5v5 (1AQ+4JC)
     convocados_auto = [n for n, i in datos_jugadores_todos.items() if i.get(KEY_CONVOCADO, False)]
     if not convocados_auto:
         st.info("No hay jugadores convocados para el análisis automático.")
@@ -483,12 +512,13 @@ def render_team_analysis_page(datos_jugadores_todos):
         campo_conv_auto = [n for n in convocados_auto if datos_jugadores_todos[n].get(KEY_TIPO) == TIPO_CAMPO]
         aq_conv_auto = [n for n in convocados_auto if datos_jugadores_todos[n].get(KEY_TIPO) == TIPO_ARQUERO]
 
+        # El análisis automático sigue siendo para 5v5 (1 Arquero + 4 de Campo)
         if len(campo_conv_auto) < 4 or not aq_conv_auto:
-            st.info("Se necesitan al menos 4 jugadores de campo y 1 arquero convocados para el análisis automático de mejores combinaciones.")
+            st.info("Se necesitan al menos 4 jugadores de campo y 1 arquero convocados para el análisis automático de mejores combinaciones 5v5.")
         else:
-            st.markdown("#### 🏆 Equilibrio General")
+            st.markdown("#### 🏆 Equilibrio General (5v5)")
             posibles_eq_gen = []
-            for combo_c in combinations(campo_conv_auto, 4):
+            for combo_c in combinations(campo_conv_auto, 4): # Sigue siendo 4 de campo
                 for aq_n in aq_conv_auto:
                     eq_nombres = list(combo_c) + [aq_n]
                     score = calcular_score_equipo_general(eq_nombres, proms_conv_auto)
@@ -499,7 +529,7 @@ def render_team_analysis_page(datos_jugadores_todos):
                 for i, (punt, eq, gk) in enumerate(mejores_eq_gen):
                     n_eq_str = " | ".join(p if p!=gk else f"🧤{EMOJI.get('Arquero','')}{p}" for p in eq)
                     st.markdown(f"<div class='highlight'><b>Equipo {i+1}</b>: {n_eq_str} <br> Puntuación: {punt:.1f}</div>", unsafe_allow_html=True)
-            else: st.info("No se generaron equipos generales.")
+            else: st.info("No se generaron equipos generales (automático).")
             st.caption("Lógica: Suma de atributos promediados.")
             st.markdown("---")
 
@@ -509,12 +539,12 @@ def render_team_analysis_page(datos_jugadores_todos):
                 {"n": "Contraataque", "f": calcular_score_contraataque, "e": "⚡", "c": "Prioriza: Velocidad, Dribbling, Transición. Roles: Wildcards, Topadoras."}
             ]
             for est in estilos:
-                st.markdown(f"#### {est['e']} {est['n']}")
+                st.markdown(f"#### {est['e']} {est['n']} (5v5)")
                 posibles_eq_est = []
-                for combo_c in combinations(campo_conv_auto, 4):
+                for combo_c in combinations(campo_conv_auto, 4): # Sigue siendo 4 de campo
                     for aq_n in aq_conv_auto:
                         eq_nombres = list(combo_c) + [aq_n]
-                        roles_eq_act = {n_j: roles_conv_auto.get(n_j, "D") for n_j in eq_nombres}
+                        roles_eq_act = {n_j: roles_conv_auto.get(n_j, "Desconocido") for n_j in eq_nombres} # Corregido "D" a "Desconocido"
                         score = est["f"](eq_nombres, proms_conv_auto, roles_eq_act, aq_n)
                         posibles_eq_est.append((score, eq_nombres, aq_n))
                 mejores_eq_est = sorted(posibles_eq_est, key=lambda x:x[0], reverse=True)[:3]
@@ -522,7 +552,7 @@ def render_team_analysis_page(datos_jugadores_todos):
                     for i, (punt, eq, gk) in enumerate(mejores_eq_est):
                         n_eq_str = " | ".join(p if p!=gk else f"🧤{EMOJI.get('Arquero','')}{p}" for p in eq)
                         st.markdown(f"<div class='highlight'><b>Equipo {i+1}</b>: {n_eq_str} <br> Puntuación {est['n']}: {punt:.1f}</div>", unsafe_allow_html=True)
-                else: st.info(f"No se generaron equipos estilo {est['n']}.")
+                else: st.info(f"No se generaron equipos estilo {est['n']} (automático).")
                 st.caption(est["c"]); st.markdown("---")
 
 def main():
@@ -533,9 +563,10 @@ def main():
         st.info("👈 Por favor, ingresa un nombre de usuario en la barra lateral y presiona 'Acceder' para usar la aplicación.")
         st.stop()
     
+    # Inicializar estado de selección para análisis manual aquí, después de que el usuario es válido
     if 'custom_gk_select' not in st.session_state: st.session_state.custom_gk_select = None
     if 'custom_field_select' not in st.session_state: st.session_state.custom_field_select = []
-    if 'nombre_equipo_manual_input' not in st.session_state: st.session_state.nombre_equipo_manual_input = "" # Inicializar como string vacío
+    if 'nombre_equipo_manual_input' not in st.session_state: st.session_state.nombre_equipo_manual_input = ""
 
     datos_jugadores = cargar_datos()
     menu_seleccionado = render_sidebar(datos_jugadores, usuario_actual)
