@@ -9,16 +9,15 @@ import numpy as np
 st.set_page_config(page_title="Perfilador 5v5", page_icon="⚽", layout="wide")
 st.markdown("""
     <style>
-        body { background-color: #003049; color: #fff; }
-        .stApp { background-color: #003049; }
-        h1, h2, h3, h4 { color: #c1121f !important; font-size: 1.7rem !important; }
-        .small-title { font-size: 1.15rem !important; color: #669bbc !important; }
-        .emoji { font-size: 1.2rem !important; }
-        .stDataFrame, .stTable { background-color: #003049 !important; }
+        body, .stApp { background-color: #669bbc !important; color: #003049; }
+        h1, h2, h3, h4 { color: #c1121f !important; font-size: 1.4rem !important; }
+        .small-title { font-size: 1.12rem !important; color: #003049 !important; }
+        .emoji { font-size: 1.1rem !important; }
+        .stDataFrame, .stTable { background-color: #f8f9fa !important; }
+        .sidebar-player { font-size: 0.99rem !important; margin-bottom:0.1em; }
     </style>
 """, unsafe_allow_html=True)
 
-# ============ EMOJIS de roles =============
 EMOJI = {
     "Arquero": "🧤",
     "Muralla": "🛡️",
@@ -36,7 +35,7 @@ ARCHIVO_DATOS = 'players.json'
 if 'editing' not in st.session_state:
     st.session_state.editing = None
 
-# ================== ATRIBUTOS ====================
+# ========== ATRIBUTOS ==========
 ATRIBUTOS_CAMPO = [
     ("First_Touch_Control",   "¿Con qué consistencia controla su primer toque?"),
     ("Short_Passing_Accuracy","¿Qué tan precisos son sus pases cortos (<5 m)?"),
@@ -84,20 +83,6 @@ def cargar_datos():
 def guardar_datos(datos):
     with open(ARCHIVO_DATOS, 'w') as f:
         json.dump(datos, f, indent=4)
-
-def promedio_atributos(rankings_usuarios):
-    rankings_usuarios = {k: v for k, v in rankings_usuarios.items() if isinstance(v, dict) and "Atributos" in v}
-    if not rankings_usuarios: return {}
-    claves = set()
-    for rank in rankings_usuarios.values():
-        claves |= set(rank["Atributos"].keys())
-    promedios = {}
-    for clave in claves:
-        valores = [rank["Atributos"].get(clave, 0) for rank in rankings_usuarios.values()]
-        promedios[clave] = round(sum(valores)/len(valores), 2)
-    return promedios
-
-# ========== FUNCIONES DE ROLES ===========
 
 def score_arquero(attrs):
     return attrs.get("GK_Reaction", 0) + attrs.get("GK_Positioning", 0) + attrs.get("GK_Foot_Play", 0)
@@ -150,10 +135,26 @@ def calcular_roles(attrs, tipo):
     percent = [(r, v, int(100*v/total)) for r, v in roles]
     return percent
 
-# ============= STREAMLIT APP ==============
-
 def main():
     st.title("Perfilador de Jugadores 5v5 de Fútbol")
+
+    datos = cargar_datos()
+    # ---- SIDEBAR: Lista de jugadores y convocatorias ----
+    st.sidebar.header("Jugadores")
+    jugadores = list(datos.keys())
+    for nombre in jugadores:
+        info = datos[nombre]
+        label = f"{EMOJI['Arquero'] if info['Tipo']=='Arquero' else ''} {nombre}"
+        convocado = info.get("convocado", True)
+        new_convocado = st.sidebar.checkbox(
+            label, value=convocado, key=f"convoc_{nombre}"
+        )
+        if new_convocado != convocado:
+            datos[nombre]["convocado"] = new_convocado
+            guardar_datos(datos)
+            st.experimental_rerun()
+    st.sidebar.markdown(f"**Total:** {len(jugadores)}")
+
     barra = st.sidebar
     barra.header("Menú")
     accion = barra.selectbox("Elige acción:", ["Agregar Jugador", "Ver Perfiles", "Analizar Equipos"])
@@ -185,7 +186,6 @@ def main():
         if nombre:
             st.markdown("### Evalúa cada atributo (0–5)")
             attrs = {}
-
             for clave, preg in ATRIBUTOS_CAMPO:
                 default = datos[nombre_edit]["Atributos"].get(clave, 2) if es_edicion else 2
                 attrs[clave] = st.slider(preg, 0, 5, default, key=clave)
@@ -210,7 +210,7 @@ def main():
                 guardar_datos(datos)
                 st.session_state.editing = None
                 st.success("Perfil guardado")
-                return
+                st.experimental_rerun()
         else:
             st.info("Ingresa un nombre para comenzar.")
 
@@ -241,32 +241,29 @@ def main():
                 c1.write(jug)
                 if c2.button("✏️", key=f"edt_{jug}"):
                     st.session_state.editing = jug
-                    return
+                    st.experimental_rerun()
                 if c3.button("✖️", key=f"del_{jug}"):
                     datos.pop(jug)
                     guardar_datos(datos)
-                    return
+                    st.experimental_rerun()
                 if c4.button("✅" if datos[jug].get("convocado", True) else "⬜️", key=f"conv_{jug}"):
                     datos[jug]["convocado"] = not datos[jug].get("convocado", True)
                     guardar_datos(datos)
-                    return
+                    st.experimental_rerun()
         else:
             st.info("No hay perfiles aún. Añade un jugador primero.")
 
     # --- ANALIZAR EQUIPOS ---
     elif accion == "Analizar Equipos":
         st.header("Compatibilidad y Construcción de Equipos")
-        nombres = [p for p, info in cargar_datos().items() if info.get("convocado", True)]
-        datos = cargar_datos()
-
-        # Roles pre-calculados por jugador
-        proms = {p: datos[p]["Atributos"] for p in nombres}
+        nombres = [p for p, info in datos.items() if info.get("convocado", True)]
         tipos = {p: datos[p]["Tipo"] for p in nombres}
+        proms = {p: datos[p]["Atributos"] for p in nombres if "Atributos" in datos[p]}
+        if len(nombres)<5:
+            st.warning("Convoca al menos 5 jugadores para análisis.")
+            return
 
-        # --- Utilidades ---
         def mejores_equipo(score_func, min_arqs=1, size=5):
-            arqs = [p for p in nombres if tipos[p] == "Arquero"]
-            campos = [p for p in nombres if tipos[p] == "Campo"]
             equipos = []
             for combo in combinations(nombres, size):
                 if sum([tipos[p]=="Arquero" for p in combo]) < min_arqs:
@@ -332,11 +329,10 @@ def main():
         if len(nombres)>=10:
             total = {p: sum(proms[p].values()) for p in nombres}
             orden = sorted(total, key=total.get, reverse=True)
-            A, B = [], []
-            for idx, p in enumerate(orden):
-                (A if idx % 2 == 0 else B).append(p)
             for i in range(3):
-                st.write(f"**Equipo A:** {', '.join(A[i::3][:5])} | **Equipo B:** {', '.join(B[i::3][:5])}")
+                A = [orden[j] for j in range(i, len(orden), 2)][:5]
+                B = [orden[j] for j in range(i+1, len(orden), 2)][:5]
+                st.write(f"**Equipo A:** {', '.join(A)} | **Equipo B:** {', '.join(B)}")
 
     barra.write(f"**Jugadores:** {len(datos)}")
 
