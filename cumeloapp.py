@@ -7,69 +7,10 @@ import numpy as np
 
 ARCHIVO_DATOS = 'players.json'
 
-# Inicializar estado de edición
 if 'editing' not in st.session_state:
     st.session_state.editing = None
 
-# ATRIBUTOS DE ROLES (según tus definiciones)
-GLADIADOR_ATTRS = [
-    "Resilience_When_Behind", "Composure", "Strength_in_Duels", "Stamina",
-    "Recovery_Runs", "Pressing_Consistency", "Marking_Tightness"
-]
-ORQUESTADOR_ATTRS = [
-    "First_Touch_Control", "Short_Passing_Accuracy", "Vision_Free_Player",
-    "Ball_Retention", "Tactical_Awareness", "Balance", "Decision_Making_Speed",
-    "Creativity", "Leadership_Presence", "Communication", "Spatial_Awareness"
-]
-WILDCARD_OFF = [
-    "Acceleration", "Dribbling_Efficiency", "Power_Dribble_and_Score",
-    "Finishing_Precision", "Attack_Transition"
-]
-WILDCARD_DEF = [
-    "Pressing_Consistency", "Marking_Tightness", "Recovery_Runs", "Strength_in_Duels"
-]
-MURALLA_ATTRS = [
-    "Strength_in_Duels", "Defense_Transition", "Leadership_Presence",
-    "Recovery_Runs", "Pressing_Consistency", "Marking_Tightness", "Tactical_Awareness"
-]
-ARQUERO_ATTRS = [
-    "GK_Reaction", "GK_Positioning", "GK_Foot_Play", "GK_Agility", "GK_Bravery", "GK_Distribution"
-]
-
-# FUNCIONES PARA CADA ROL
-def score_gladiador(attrs):
-    return sum(attrs.get(k, 0) for k in GLADIADOR_ATTRS)
-
-def score_orquestador(attrs):
-    return sum(attrs.get(k, 0) for k in ORQUESTADOR_ATTRS)
-
-def score_wildcard(attrs):
-    # Suma de ofensivos menos suma de defensivos (defensivos penalizan)
-    off = sum(attrs.get(k, 0) for k in WILDCARD_OFF)
-    # Para WILDCARD, menor defensa = mayor score
-    # Se invierte la suma defensiva (5-puntaje, pues sliders de 0 a 5)
-    defense = sum(5 - attrs.get(k, 0) for k in WILDCARD_DEF)
-    return off + defense
-
-def score_muralla(attrs):
-    return sum(attrs.get(k, 0) for k in MURALLA_ATTRS)
-
-def score_arquero(attrs):
-    # GK_Reaction es clave, pero suma todo para ranking completo
-    return sum(attrs.get(k, 0) for k in ARQUERO_ATTRS)
-
-# Funciones para cargar y guardar datos
-def cargar_datos():
-    if os.path.exists(ARCHIVO_DATOS):
-        with open(ARCHIVO_DATOS, 'r') as f:
-            return json.load(f)
-    return {}
-
-def guardar_datos(datos):
-    with open(ARCHIVO_DATOS, 'w') as f:
-        json.dump(datos, f, indent=4)
-
-# Definición de atributos de campo (25)
+# ================== ATRIBUTOS ====================
 ATRIBUTOS_CAMPO = [
     ("First_Touch_Control",   "¿Con qué consistencia controla su primer toque?"),
     ("Short_Passing_Accuracy","¿Qué tan precisos son sus pases cortos (<5 m)?"),
@@ -97,8 +38,6 @@ ATRIBUTOS_CAMPO = [
     ("Defense_Transition",    "¿Qué tan bien transiciona de ataque a defensa?"),
     ("Spatial_Awareness",     "¿Qué tan buena es su conciencia del espacio libre alrededor?"),
 ]
-
-# Definición de atributos de arquero
 ATRIBUTOS_ARQUERO = [
     ("GK_Foot_Play",    "¿Qué tan habilidoso es jugando con los pies?"),
     ("GK_Agility",      "¿Qué tan ágil es para reaccionar a tiros y cambios de dirección?"),
@@ -107,190 +46,271 @@ ATRIBUTOS_ARQUERO = [
     ("GK_Positioning",  "¿Qué tan buena es su colocación y lectura de trayectorias?"),
     ("GK_Distribution", "¿Qué precisión tiene al distribuir balones largos y cortos?"),
 ]
-
 TIPOS_JUGADOR = ["Campo", "Arquero"]
 ATR_GK_CAMPO = ["GK_Foot_Play", "GK_Agility", "GK_Bravery"]
 
+# ================ UTILIDADES =====================
+
+def cargar_datos():
+    if os.path.exists(ARCHIVO_DATOS):
+        with open(ARCHIVO_DATOS, 'r') as f:
+            return json.load(f)
+    return {}
+
+def guardar_datos(datos):
+    with open(ARCHIVO_DATOS, 'w') as f:
+        json.dump(datos, f, indent=4)
+
+def promedio_atributos(rankings_usuarios):
+    if not rankings_usuarios: return {}
+    claves = set()
+    for rank in rankings_usuarios.values():
+        claves |= set(rank["Atributos"].keys())
+    promedios = {}
+    for clave in claves:
+        valores = [rank["Atributos"].get(clave, 0) for rank in rankings_usuarios.values()]
+        promedios[clave] = round(sum(valores)/len(valores), 2)
+    return promedios
+
+# ========== FUNCIONES DE ROLES ===========
+
+def score_arquero(attrs):
+    return attrs.get("GK_Reaction", 0) + attrs.get("GK_Positioning", 0) + attrs.get("GK_Foot_Play", 0)
+
+def score_muralla(attrs):
+    return (attrs.get("Strength_in_Duels",0)*2 + attrs.get("Defense_Transition",0) + attrs.get("Leadership_Presence",0)
+        + attrs.get("Recovery_Runs",0) + attrs.get("Pressing_Consistency",0) + attrs.get("Marking_Tightness",0)
+        + attrs.get("Tactical_Awareness",0))
+
+def score_wildcard(attrs):
+    ataque = (
+        attrs.get("Acceleration",0) + attrs.get("Dribbling_Efficiency",0) +
+        attrs.get("Power_Dribble_and_Score",0) + attrs.get("Finishing_Precision",0) +
+        attrs.get("Attack_Transition",0)
+    )
+    defensa_baja = (
+        5 - attrs.get("Pressing_Consistency",0) + 5 - attrs.get("Marking_Tightness",0) +
+        5 - attrs.get("Recovery_Runs",0) + 5 - attrs.get("Strength_in_Duels",0)
+    )
+    return ataque + defensa_baja
+
+def score_orquestador(attrs):
+    return (attrs.get("First_Touch_Control",0) + attrs.get("Short_Passing_Accuracy",0)
+            + attrs.get("Vision_Free_Player",0) + attrs.get("Ball_Retention",0) + attrs.get("Tactical_Awareness",0)
+            + attrs.get("Balance",0) + attrs.get("Decision_Making_Speed",0) + attrs.get("Creativity",0)
+            + attrs.get("Leadership_Presence",0) + attrs.get("Communication",0) + attrs.get("Spatial_Awareness",0))
+
+def score_gladiador(attrs):
+    return (attrs.get("Resilience_When_Behind",0) + attrs.get("Composure",0) + attrs.get("Strength_in_Duels",0)
+            + attrs.get("Stamina",0) + attrs.get("Recovery_Runs",0) + attrs.get("Pressing_Consistency",0)
+            + attrs.get("Marking_Tightness",0))
+
+def roles_scores(attrs):
+    roles = {
+        "Arquero": score_arquero(attrs),
+        "Muralla": score_muralla(attrs),
+        "Wildcard": score_wildcard(attrs),
+        "Orquestador": score_orquestador(attrs),
+        "Gladiador": score_gladiador(attrs),
+    }
+    total = sum(v for v in roles.values() if v > 0)
+    porcentajes = {k: (v/total*100 if total > 0 else 0) for k, v in roles.items()}
+    principal = max(roles, key=roles.get)
+    secundarios = sorted([k for k in roles if k != principal], key=lambda k: roles[k], reverse=True)
+    return principal, secundarios, porcentajes, roles
+
+# ========== DIFERENCIAL PARA RULETA RUSA ==========
+# Calcula el máximo diferencial entre los grupos Ataque, Defensa y Mental
+def score_ruletarusa(attrs):
+    # Agrupa atributos en tres dimensiones
+    ataque = [
+        "Acceleration","Attack_Transition","Finishing_Precision","Dribbling_Efficiency",
+        "Power_Dribble_and_Score","First_Touch_Control","Short_Passing_Accuracy","Agility"
+    ]
+    defensa = [
+        "Defense_Transition","Strength_in_Duels","Marking_Tightness","Pressing_Consistency",
+        "Recovery_Runs","Stamina","Tactical_Awareness"
+    ]
+    mental = [
+        "Composure","Decision_Making_Speed","Leadership_Presence","Communication",
+        "Vision_Free_Player","Creativity","Spatial_Awareness","Ball_Retention"
+    ]
+    vals = lambda keys: np.mean([attrs.get(k,0) for k in keys])
+    scores = [vals(ataque), vals(defensa), vals(mental)]
+    diff = max(scores) - min(scores)
+    return diff
+
+# ================ MAIN STREAMLIT ================
 def main():
-    st.title("Perfilador de Jugadores 5v5 de Fútbol")
+    st.title("Perfilador de Jugadores 5v5 – Colaborativo, Roles y Equipos Especiales")
+
+    usuario = st.sidebar.text_input("Tu nombre (anónimo en la interfaz)", value=st.session_state.get("usuario", ""))
+    if usuario:
+        st.session_state["usuario"] = usuario
+    if not usuario:
+        st.warning("Por favor ingresa tu nombre de usuario (anónimo) en la barra lateral para continuar.")
+        st.stop()
+
     barra = st.sidebar
     barra.header("Menú")
-    accion = barra.selectbox("Elige acción:", ["Agregar Jugador", "Ver Perfiles", "Analizar Equipos"])
+    accion = barra.selectbox("Elige acción:", [
+        "Agregar/Rankear Jugador", 
+        "Ver Perfiles Promediados", 
+        "Analizar Equipos"
+    ])
     if st.session_state.editing is not None:
-        accion = "Agregar Jugador"
+        accion = "Agregar/Rankear Jugador"
     datos = cargar_datos()
 
-    # --- AGREGAR / EDITAR JUGADOR ---
-    if accion == "Agregar Jugador":
-        nombre_edit = st.session_state.editing
-        es_edicion = nombre_edit is not None
+    # ---- Convocatoria (sidebar)
+    st.sidebar.markdown("## Convocatoria")
+    convocados = {}
+    for nombre in datos:
+        convocados[nombre] = st.sidebar.checkbox(f"{nombre}", value=datos[nombre].get("convocado", True))
+    for nombre in datos:
+        datos[nombre]["convocado"] = convocados[nombre]
+    guardar_datos(datos)
 
-        # Encabezado y tipo
-        if es_edicion:
-            st.header(f"Editando perfil de {nombre_edit}")
-            tipo = datos[nombre_edit]["Tipo"]
-        else:
-            st.header("Agregar nuevo jugador")
-            tipo = st.radio("Tipo de jugador:", TIPOS_JUGADOR)
-
-        # Rotación arquero
-        if tipo == "Arquero":
-            rot_idx = 0
-            if es_edicion:
-                rot_idx = 0 if datos[nombre_edit].get("GK_Rotacion", "Titular") == "Titular" else 1
-            rot = st.selectbox("Arquero:", ["Titular", "Rotativo"], index=rot_idx)
-
-        # Nombre
-        default_name = nombre_edit if es_edicion else ""
-        nombre = st.text_input("Nombre del Jugador", value=default_name, key="player_name")
-
+    # --- AGREGAR / RANQUEAR JUGADOR ---
+    if accion == "Agregar/Rankear Jugador":
+        jugadores = list(datos.keys())
+        nombre = st.selectbox("Jugador a rankear", ["Nuevo..."] + jugadores)
+        if nombre == "Nuevo...":
+            nombre_nuevo = st.text_input("Nombre del nuevo jugador", "")
+            if nombre_nuevo:
+                nombre = nombre_nuevo
         if nombre:
+            tipo = st.radio("Tipo de jugador:", TIPOS_JUGADOR, key=f"tipo_{nombre}")
             st.markdown("### Evalúa cada atributo (0–5)")
             attrs = {}
-
-            # Atributos campo
             for clave, preg in ATRIBUTOS_CAMPO:
-                default = datos[nombre_edit]["Atributos"].get(clave, 2) if es_edicion else 2
-                attrs[clave] = st.slider(preg, 0, 5, default, key=clave)
-
-            # Atributos GK opcionales si es campo
+                valor = datos.get(nombre, {}).get(usuario, {}).get("Atributos", {}).get(clave, 2)
+                attrs[clave] = st.slider(preg, 0, 5, valor, key=f"{clave}_{nombre}")
             if tipo == "Campo":
                 for clave in ATR_GK_CAMPO:
                     preg = dict(ATRIBUTOS_ARQUERO)[clave]
-                    default = datos[nombre_edit]["Atributos"].get(clave, 2) if es_edicion else 2
-                    attrs[clave] = st.slider(preg, 0, 5, default, key=clave)
+                    valor = datos.get(nombre, {}).get(usuario, {}).get("Atributos", {}).get(clave, 2)
+                    attrs[clave] = st.slider(preg, 0, 5, valor, key=f"{clave}_{nombre}")
             else:
                 for clave, preg in ATRIBUTOS_ARQUERO:
-                    default = datos[nombre_edit]["Atributos"].get(clave, 2) if es_edicion else 2
-                    attrs[clave] = st.slider(preg, 0, 5, default, key=clave)
-                attrs["GK_Rotacion"] = rot
-
-            # Guardar perfil
-            if st.button("Guardar Perfil"):
-                datos[nombre] = {"Tipo": tipo, "Atributos": attrs}
-                if tipo == "Arquero":
-                    datos[nombre]["GK_Rotacion"] = rot
+                    valor = datos.get(nombre, {}).get(usuario, {}).get("Atributos", {}).get(clave, 2)
+                    attrs[clave] = st.slider(preg, 0, 5, valor, key=f"{clave}_{nombre}")
+            if st.button("Guardar Ranking"):
+                if nombre not in datos:
+                    datos[nombre] = {}
+                datos[nombre][usuario] = {"Atributos": attrs, "Tipo": tipo}
+                if "convocado" not in datos[nombre]:
+                    datos[nombre]["convocado"] = True
                 guardar_datos(datos)
-                st.session_state.editing = None
-                st.success("Perfil guardado")
-                return
-        else:
-            st.info("Ingresa un nombre para comenzar.")
+                st.success("Ranking guardado correctamente.")
 
-    # --- VER PERFILES ---
-    elif accion == "Ver Perfiles":
-        st.header("Perfiles de Jugadores Guardados")
-        st.markdown(f"**Total de jugadores evaluados:** {len(datos)}")
-
+    # --- VER PERFILES PROMEDIADOS ---
+    elif accion == "Ver Perfiles Promediados":
+        st.header("Perfiles de Jugadores (Promedio de rankings)")
         if datos:
             filas = []
-            for jug, info in datos.items():
-                fila = {"Nombre": jug, "Tipo": info["Tipo"]}
-                fila.update(info["Atributos"])
-                fila["Gladiador"] = score_gladiador(info["Atributos"])
-                fila["Orquestador"] = score_orquestador(info["Atributos"])
-                fila["Wildcard"] = score_wildcard(info["Atributos"])
-                fila["Muralla"] = score_muralla(info["Atributos"])
-                fila["Arquero"] = score_arquero(info["Atributos"])
+            for jug, rankings in datos.items():
+                if not rankings.get("convocado", True):
+                    continue
+                rankings_usuarios = {k: v for k, v in rankings.items() if k not in ["convocado"]}
+                attrs_avg = promedio_atributos(rankings_usuarios)
+                tipos = [rank.get("Tipo") for rank in rankings_usuarios.values() if "Tipo" in rank]
+                tipo = max(set(tipos), key=tipos.count) if tipos else ""
+                principal, secundarios, porcentajes, roles = roles_scores(attrs_avg)
+                sec = secundarios[0] if secundarios else ""
+                fila = {
+                    "Nombre": jug,
+                    "Tipo": tipo,
+                    "Rol principal": f"{principal} ({porcentajes[principal]:.0f}%)",
+                    "Rol secundario": f"{sec} ({porcentajes[sec]:.0f}%)" if sec else "",
+                    **attrs_avg
+                }
                 filas.append(fila)
             df = pd.DataFrame(filas).set_index("Nombre")
             st.dataframe(df)
-
-            # Botones de editar y borrar
-            st.write("---")
-            for jug in list(datos.keys()):
-                c1, c2, c3 = st.columns([6, 1, 1])
-                c1.write(jug)
-                if c2.button("✏️", key=f"edt_{jug}"):
-                    st.session_state.editing = jug
-                    return
-                if c3.button("✖️", key=f"del_{jug}"):
-                    datos.pop(jug)
-                    guardar_datos(datos)
-                    return
         else:
-            st.info("No hay perfiles aún. Añade un jugador primero.")
+            st.info("No hay rankings aún.")
 
     # --- ANALIZAR EQUIPOS ---
     elif accion == "Analizar Equipos":
-        st.header("Compatibilidad y Construcción de Equipos")
-        nombres = list(datos.keys())
-
-        # Distancias
-        if len(nombres) < 2:
-            st.warning("Se necesitan al menos 2 jugadores.")
+        st.header("Análisis de equipos")
+        nombres = [n for n in datos.keys() if datos[n].get("convocado", True)]
+        if len(nombres) < 5:
+            st.warning("Se necesitan al menos 5 jugadores convocados.")
         else:
-            mat = []
-            for p in nombres:
-                v = [datos[p]["Atributos"].get(k, 0) for k, _ in ATRIBUTOS_CAMPO]
-                v += [datos[p]["Atributos"].get(k, 0) for k in ATR_GK_CAMPO]
-                v += [datos[p]["Atributos"].get(k, 0) for k, _ in ATRIBUTOS_ARQUERO]
-                mat.append(v)
-            arr = np.array(mat)
-            dist_list = []
-            for i, j in combinations(range(len(nombres)), 2):
-                d = np.linalg.norm(arr[i] - arr[j])
-                dist_list.append({"A": nombres[i], "B": nombres[j], "Dist": round(d, 2)})
-            df_dist = pd.DataFrame(dist_list).sort_values("Dist", ascending=False)
-            st.subheader("Distancias por Pareja")
-            st.dataframe(df_dist)
-            mejor, peor = df_dist.iloc[0], df_dist.iloc[-1]
-            st.markdown(f"**Más complementarios:** {mejor['A']} & {mejor['B']} (Dist {mejor['Dist']})")
-            st.markdown(f"**Más similares:** {peor['A']} & {peor['B']} (Dist {peor['Dist']})")
+            proms = {p: promedio_atributos({k:v for k,v in datos[p].items() if k not in ["convocado"]}) for p in nombres}
 
-            # Mejor por rol
-            st.info(f"🥾 Mejor Gladiador: {max(nombres, key=lambda p: score_gladiador(datos[p]['Atributos']))}")
-            st.info(f"🎩 Mejor Orquestador: {max(nombres, key=lambda p: score_orquestador(datos[p]['Atributos']))}")
-            st.info(f"🔥 Mejor Wildcard: {max(nombres, key=lambda p: score_wildcard(datos[p]['Atributos']))}")
-            st.info(f"💪 Mejor Muralla: {max(nombres, key=lambda p: score_muralla(datos[p]['Atributos']))}")
-            st.info(f"🧤 Mejor Arquero: {max(nombres, key=lambda p: score_arquero(datos[p]['Atributos']))}")
+            # TOP 3 de cada rol
+            for rol, fun in [
+                ("Gladiador", score_gladiador),
+                ("Orquestador", score_orquestador),
+                ("Wildcard", score_wildcard),
+                ("Muralla", score_muralla),
+                ("Arquero", score_arquero),
+                ("Ruleta Rusa", score_ruletarusa),
+            ]:
+                top3 = sorted(nombres, key=lambda p: fun(proms[p]), reverse=True)[:3]
+                st.markdown(f"**Top 3 {rol}:** {' | '.join(top3)}")
 
-        # Mejor equipo 5-a-side
-        if len(nombres) >= 5:
-            best_score, best_combo = -1, None
-            for combo in combinations(nombres, 5):
-                if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1:
-                    continue
-                speeds = [datos[p]['Atributos'].get('Acceleration', 0) for p in combo]
-                strengths = [datos[p]['Atributos'].get('Strength_in_Duels', 0) for p in combo]
-                leaders = [datos[p]['Atributos'].get('Leadership_Presence', 0) for p in combo]
-                score = min(speeds) + min(strengths) + min(leaders)
-                if score > best_score:
-                    best_score, best_combo = score, combo
-            if best_combo:
-                st.subheader("🏆 Mejor Equipo 5-a-side")
-                st.write(", ".join(best_combo))
-                roles = {}
-                used = set()
-                asigns = [
-                    ('Arquero', 'GK_Reaction'),
-                    ('Extremo', 'Acceleration'),
-                    ('Defensor', 'Strength_in_Duels'),
-                    ('Capitán', 'Leadership_Presence'),
-                    ('Creador', 'Creativity'),
-                ]
-                for rol, atr in asigns:
-                    pick = max(
-                        (p for p in best_combo if p not in used),
-                        key=lambda p: datos[p]['Atributos'].get(atr, 0)
-                    )
-                    roles[pick] = rol
-                    used.add(pick)
-                st.table(pd.DataFrame.from_dict(roles, orient='index', columns=['Rol']))
+            # MEJOR EQUIPO (uno por rol)
+            equipo = []
+            rol_funcs = [
+                ("Arquero", score_arquero),
+                ("Muralla", score_muralla),
+                ("Wildcard", score_wildcard),
+                ("Orquestador", score_orquestador),
+                ("Gladiador", score_gladiador),
+            ]
+            usados = set()
+            for rol, fun in rol_funcs:
+                disponibles = [p for p in nombres if p not in usados]
+                pick = max(disponibles, key=lambda p: fun(proms[p]))
+                equipo.append(f"{pick} ({rol})")
+                usados.add(pick)
+            st.markdown(f"**Mejor Equipo 5-a-side (Roles nuevos):** {', '.join(equipo)}")
 
-        # Dos equipos balanceados
-        if len(nombres) >= 10:
-            st.subheader("🤝 Dos Equipos Balanceados")
-            total = {
-                p: sum(v for v in datos[p]['Atributos'].values() if isinstance(v, (int, float)))
-                for p in nombres
-            }
-            orden = sorted(total, key=total.get, reverse=True)
-            A, B = [], []
-            for idx, p in enumerate(orden):
-                (A if idx % 2 == 0 else B).append(p)
-            st.write("**Equipo A:**", ", ".join(A[:5]))
-            st.write("**Equipo B:**", ", ".join(B[:5]))
+            # Equipos especiales
+            def score_cat(p):
+                return (
+                    score_muralla(proms[p]) + score_gladiador(proms[p]) +
+                    proms[p].get("Composure",0) + proms[p].get("Tactical_Awareness",0) +
+                    proms[p].get("Leadership_Presence",0) + proms[p].get("Communication",0) +
+                    proms[p].get("Stamina",0) + proms[p].get("Recovery_Runs",0)
+                )
+            def score_contra(p):
+                return (
+                    score_wildcard(proms[p]) + proms[p].get("Acceleration",0) + proms[p].get("Attack_Transition",0) +
+                    proms[p].get("First_Touch_Control",0) + proms[p].get("Short_Passing_Accuracy",0) +
+                    proms[p].get("Finishing_Precision",0) + proms[p].get("Dribbling_Efficiency",0) +
+                    proms[p].get("Power_Dribble_and_Score",0) + proms[p].get("Agility",0) +
+                    proms[p].get("Stamina",0) + proms[p].get("Decision_Making_Speed",0)
+                )
+            def score_tikitaka(p):
+                return (
+                    score_orquestador(proms[p]) + proms[p].get("Ball_Retention",0) +
+                    proms[p].get("Short_Passing_Accuracy",0) + proms[p].get("Creativity",0) +
+                    proms[p].get("Decision_Making_Speed",0) + proms[p].get("Composure",0) +
+                    proms[p].get("Communication",0) + proms[p].get("Vision_Free_Player",0) +
+                    proms[p].get("Spatial_Awareness",0)
+                )
+            def score_ruleta(p):
+                return score_ruletarusa(proms[p]) # cuanto más grande, más desequilibrado
+
+            def best_team(fun, nombre):
+                best, best_score = None, -1
+                for combo in combinations(nombres, 5):
+                    if sum(1 for p in combo if datos[p][next(iter([k for k in datos[p] if k not in ['convocado']]), None)]["Tipo"] == "Arquero") != 1:
+                        continue
+                    s = sum(fun(p) for p in combo)
+                    if s > best_score:
+                        best_score, best = s, combo
+                if best:
+                    st.markdown(f"**{nombre}:** {', '.join(best)}")
+
+            best_team(score_cat, "Mejor Catenaccio (Defensivo)")
+            best_team(score_contra, "Mejor Contraataque")
+            best_team(score_tikitaka, "Mejor Tiki Taka")
+            best_team(score_ruleta, "Mejor Ruleta Rusa (desbalanceados)")
 
     barra.write(f"**Jugadores:** {len(datos)}")
 
