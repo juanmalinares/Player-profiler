@@ -354,4 +354,18 @@ def main():
         if len(nombres)>=5:
             best_score, best_team = -float('inf'), None
             for combo in combinations(nombres, 5):
-                if sum(1 for p in combo if datos[p]['Tipo'] ==
+                if sum(1 for p in combo if datos[p]['Tipo'] == 'Arquero') != 1:
+                    continue
+                team_score = sum(
+                    score_wildcard(proms[combo[0]]) +
+                    score_gladiador(proms[combo[1]]) +
+                    score_orquestador(proms[combo[2]]) +
+                    score_topadora(proms[combo[3]]) +
+                    score_muralla(proms[combo[4]])
+                )
+                if team_score > best_score:
+                    best_score, best_team = team_score, combo
+            st.markdown(f"<div class='seccion'><b>Equipo óptimo:</b> {' | '.join([n for n in best_team])}</div>", unsafe_allow_html=True)
+
+if __name__ == "__main__":
+    main()
