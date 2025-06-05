@@ -67,13 +67,27 @@ def aplicar_estilos_css():
         .css-18e3th9 .stCheckbox label, .st-emotion-cache-18e3th9 .stCheckbox label {
              color: #e8e8e8 !important; 
         }
+        /* Ajuste para botones en la sidebar */
+        .css-18e3th9 .stButton>button, .st-emotion-cache-18e3th9 .stButton>button {
+            border: 1px solid #e8e8e8; /* Borde claro para botones en sidebar oscura */
+            color: #e8e8e8;
+            background-color: transparent; /* Sin fondo para que se vea el de la sidebar */
+            padding: 0.25em 0.5em; /* Hacerlos un poco más pequeños */
+            font-size: 0.8em; /* Texto más pequeño */
+            margin: 0 2px; /* Pequeño margen */
+        }
+        .css-18e3th9 .stButton>button:hover, .st-emotion-cache-18e3th9 .stButton>button:hover {
+            border-color: #c1121f;
+            color: #c1121f;
+        }
+
         .stDataFrame { background-color: #003049; color: #fff;}
         h1, h2, h3, h4, h5 { color: #c1121f; font-size: 1.25em; margin-bottom: 0.25em;}
         .highlight {background: #669bbc22; border-radius: 10px; padding: 0.7em 1em; margin-bottom:1.2em; color: #333333; border: 1px solid #669bbc44;}
         .stRadio > label { font-size: 1.1em; color: #333333 !important; display: flex; align-items: center; margin-bottom: 0.5rem;}
         .stRadio > label > div > span { color: #333333 !important; }
         .stTextInput label, .stSlider label, .stSelectbox label, .stMultiselect label { color: #333333 !important; }
-        .stButton>button {border-radius: 0.5rem; border: 1px solid #003049; color: #003049; padding: 0.5em 1em;}
+        .stButton>button {border-radius: 0.5rem; border: 1px solid #003049; color: #003049; padding: 0.5em 1em;} /* Botones principales */
         .stButton>button:hover {border-color: #c1121f; color: #c1121f;}
         .stButton>button:focus:not(:active) {border-color: #c1121f; color: #c1121f; box-shadow: 0 0 0 0.2rem rgba(193, 18, 31, 0.25);}
         .stCheckbox > label > div > span { color: #333333 !important; }
@@ -269,6 +283,7 @@ def calcular_score_contraataque(equipo, promedios_j, roles_e, aq_name=None):
     if njc>0 and (ssc/njc)>=stfb: score+=20 
     return score
 
+# --- UI Rendering Functions ---
 def render_sidebar(datos_jug, user_name):
     st.sidebar.title("⚽ Menú")
     st.sidebar.markdown(f"Usuario: **{user_name}**")
@@ -284,18 +299,63 @@ def render_sidebar(datos_jug, user_name):
     st.session_state.menu_selection = menu
     st.sidebar.markdown("---")
     st.sidebar.markdown("#### Jugadores Convocados")
-    changed = False
+    
+    # Estado para confirmación de borrado
+    if 'confirm_delete_player' not in st.session_state:
+        st.session_state.confirm_delete_player = None # Almacenará el nombre del jugador a borrar
+
+    changed_convocatoria = False
     for name in sorted(datos_jug.keys()):
         info = datos_jug[name]
         proms = promedio_atributos(info.get(KEY_VOTACIONES, {}))
         rol, _ = obtener_rol(proms, info.get(KEY_TIPO, TIPO_CAMPO))
         conv = info.get(KEY_CONVOCADO, True)
         emoji = EMOJI.get(rol,"👤")
-        new_conv = st.sidebar.checkbox(f"{emoji} {name}", value=conv, key=f"convoc_{name}_sidebar")
-        if datos_jug[name].get(KEY_CONVOCADO,True) != new_conv:
-            datos_jug[name][KEY_CONVOCADO] = new_conv
-            changed = True
-    if changed:
+
+        # Layout para checkbox, nombre y botones
+        col_check, col_edit, col_del = st.columns([0.7, 0.15, 0.15])
+
+        with col_check:
+            new_conv = st.checkbox(f"{emoji} {name}", value=conv, key=f"convoc_{name}_sidebar_v3")
+            if conv != new_conv:
+                datos_jug[name][KEY_CONVOCADO] = new_conv
+                changed_convocatoria = True
+        
+        with col_edit:
+            if st.button("✏️", key=f"edit_btn_{name}_sidebar", help=f"Editar {name}", use_container_width=True):
+                st.session_state.nombre_jugador_input_ae_current = name
+                st.session_state.menu_selection = "Agregar o editar jugador"
+                # Limpiar selecciones de equipo manual para evitar conflictos
+                if 'manual_team_selection' in st.session_state: st.session_state.manual_team_selection = []
+                if 'nombre_equipo_manual_input_v3' in st.session_state: st.session_state.nombre_equipo_manual_input_v3 = ""
+                st.rerun()
+        
+        with col_del:
+            if st.button("🗑️", key=f"delete_btn_{name}_sidebar_ask", help=f"Eliminar {name}", use_container_width=True):
+                st.session_state.confirm_delete_player = name # Marcar para confirmación
+                st.rerun() # Rerun para mostrar la confirmación
+    
+    # Lógica de confirmación de borrado
+    if st.session_state.confirm_delete_player:
+        player_to_del = st.session_state.confirm_delete_player
+        st.sidebar.markdown("---")
+        st.sidebar.warning(f"¿Seguro que quieres eliminar a **{player_to_del}**?")
+        col_confirm, col_cancel = st.sidebar.columns(2)
+        if col_confirm.button("Sí, eliminar", key=f"confirm_del_{player_to_del}"):
+            if player_to_del in datos_jug:
+                del datos_jug[player_to_del]
+                guardar_datos(datos_jug)
+                st.success(f"Jugador '{player_to_del}' eliminado.")
+                if st.session_state.get("nombre_jugador_input_ae_current") == player_to_del:
+                    st.session_state.nombre_jugador_input_ae_current = ""
+                st.session_state.confirm_delete_player = None # Resetear confirmación
+                st.rerun()
+        if col_cancel.button("Cancelar", key=f"cancel_del_{player_to_del}"):
+            st.session_state.confirm_delete_player = None
+            st.rerun()
+
+
+    if changed_convocatoria:
         guardar_datos(datos_jug)
         st.rerun()
     return menu
@@ -306,55 +366,70 @@ def render_add_edit_player_page(datos, usuario):
     if nombre_key_session not in st.session_state:
         st.session_state[nombre_key_session] = ""
 
+    # El nombre del jugador se toma de session_state si se vino de "editar"
+    # o es el valor que el usuario está escribiendo.
     nombre_jugador_actual_input = st.text_input(
         "Nombre del jugador", 
         value=st.session_state[nombre_key_session], 
-        key=nombre_key_session + "_widget_input" 
+        key=nombre_key_session + "_widget_input_v2" # Nueva key para asegurar refresco
     )
-    st.session_state[nombre_key_session] = nombre_jugador_actual_input
-    nombre_jugador = nombre_jugador_actual_input.strip() 
+    # Importante: Actualizar session_state con lo que se escribe para que los sliders usen el nombre correcto en sus keys
+    st.session_state[nombre_key_session] = nombre_jugador_actual_input 
+    nombre_jugador_para_sliders = nombre_jugador_actual_input.strip() # Usar el nombre actual para las keys de los sliders
     
     tipo_idx = 0
-    if nombre_jugador and nombre_jugador in datos and datos[nombre_jugador].get(KEY_TIPO) == TIPO_ARQUERO: tipo_idx = 1
-    tipo_jugador = st.radio("Tipo de Jugador", TIPOS_JUGADOR, horizontal=True, index=tipo_idx, key="tipo_jugador_radio_ae")
+    # Usar nombre_jugador_para_sliders para cargar datos existentes
+    if nombre_jugador_para_sliders and nombre_jugador_para_sliders in datos and datos[nombre_jugador_para_sliders].get(KEY_TIPO) == TIPO_ARQUERO: 
+        tipo_idx = 1
+    tipo_jugador = st.radio("Tipo de Jugador", TIPOS_JUGADOR, horizontal=True, index=tipo_idx, key="tipo_jugador_radio_ae_v2")
     
     attrs_actuales = {}
-    player_data = datos.get(nombre_jugador)
+    player_data = datos.get(nombre_jugador_para_sliders) # Usar el nombre actual para buscar datos
     ratings = {}
-    caption_text = f"{nombre_jugador if nombre_jugador else 'Nuevo Jugador'} aún no tiene valoraciones (o no existe)."
+    caption_text = f"{nombre_jugador_para_sliders if nombre_jugador_para_sliders else 'Nuevo Jugador'} aún no tiene valoraciones (o no existe)."
     if player_data:
         if usuario in player_data.get(KEY_VOTACIONES, {}):
             ratings = player_data[KEY_VOTACIONES][usuario]
-            caption_text = f"Mostrando tus valoraciones previas para {nombre_jugador}."
+            caption_text = f"Mostrando tus valoraciones previas para {nombre_jugador_para_sliders}."
         else:
             ratings = promedio_atributos(player_data.get(KEY_VOTACIONES, {}))
-            if ratings: caption_text = f"Mostrando valoraciones promedio para {nombre_jugador} (aún no has votado)."
-            else: caption_text = f"{nombre_jugador} no tiene valoraciones promedio. Establece las iniciales."
-    elif nombre_jugador: 
-        caption_text = f"Agregando nuevo jugador: {nombre_jugador}. Establece sus atributos."
+            if ratings: caption_text = f"Mostrando valoraciones promedio para {nombre_jugador_para_sliders} (aún no has votado)."
+            else: caption_text = f"{nombre_jugador_para_sliders} no tiene valoraciones promedio. Establece las iniciales."
+    elif nombre_jugador_para_sliders: 
+        caption_text = f"Agregando nuevo jugador: {nombre_jugador_para_sliders}. Establece sus atributos."
 
     st.caption(caption_text)
 
     default_slider_val = 5 
     st.markdown("---"); st.subheader("Atributos de Campo")
-    for k,q in ATRIBUTOS_CAMPO_DEF: attrs_actuales[k] = st.slider(q,0,10,int(round(ratings.get(k, default_slider_val))),key=f"slider_{nombre_jugador}_{k}")
+    for k,q in ATRIBUTOS_CAMPO_DEF: 
+        # Usar nombre_jugador_para_sliders en la key del slider para que se actualice si el nombre cambia
+        attrs_actuales[k] = st.slider(q,0,10,int(round(ratings.get(k, default_slider_val))),key=f"slider_{nombre_jugador_para_sliders}_{k}_v2")
     st.markdown("---")
     if tipo_jugador == TIPO_CAMPO:
         st.subheader("Atributos Adicionales (Portero para Jugador de Campo)")
         d_aq_atr = dict(ATRIBUTOS_ARQUERO_DEF)
-        for k in ATR_GK_CAMPO: attrs_actuales[k] = st.slider(d_aq_atr.get(k,k.replace("_"," ")),0,10,int(round(ratings.get(k,default_slider_val))),key=f"slider_{nombre_jugador}_{k}_gkc")
+        for k in ATR_GK_CAMPO: 
+            attrs_actuales[k] = st.slider(d_aq_atr.get(k,k.replace("_"," ")),0,10,int(round(ratings.get(k,default_slider_val))),key=f"slider_{nombre_jugador_para_sliders}_{k}_gkc_v2")
     elif tipo_jugador == TIPO_ARQUERO:
         st.subheader("Atributos de Arquero")
-        for k,q in ATRIBUTOS_ARQUERO_DEF: attrs_actuales[k] = st.slider(q,0,10,int(round(ratings.get(k,default_slider_val))),key=f"slider_{nombre_jugador}_{k}_aq")
+        for k,q in ATRIBUTOS_ARQUERO_DEF: 
+            attrs_actuales[k] = st.slider(q,0,10,int(round(ratings.get(k,default_slider_val))),key=f"slider_{nombre_jugador_para_sliders}_{k}_aq_v2")
 
-    if st.button("💾 Guardar/Actualizar Jugador", key="save_player_btn_ae"):
-        nombre_a_guardar = st.session_state[nombre_key_session].strip() 
+    if st.button("💾 Guardar/Actualizar Jugador", key="save_player_btn_ae_v2"):
+        nombre_a_guardar = st.session_state[nombre_key_session].strip() # Confirmar el nombre desde session_state al momento del click
         if not nombre_a_guardar: 
             st.error("El nombre del jugador no puede estar vacío.")
             return
         
         if nombre_a_guardar not in datos: 
             datos[nombre_a_guardar] = {KEY_TIPO: tipo_jugador, KEY_VOTACIONES:{}, KEY_CONVOCADO:True}
+        
+        # Si el nombre cambió (ej. se editó un jugador y se cambió su nombre),
+        # hay que borrar la entrada antigua si se quiere renombrar.
+        # Por ahora, si el nombre en el input es diferente al original (si venimos de editar),
+        # se creará uno nuevo o sobreescribirá si ya existe con ese nuevo nombre.
+        # Si se quisiera una lógica de "renombrar" real, sería más complejo.
         
         datos[nombre_a_guardar][KEY_TIPO] = tipo_jugador 
         if KEY_VOTACIONES not in datos[nombre_a_guardar] or not isinstance(datos[nombre_a_guardar].get(KEY_VOTACIONES),dict): 
@@ -367,7 +442,7 @@ def render_add_edit_player_page(datos, usuario):
         st.success(f"¡Jugador '{nombre_a_guardar}' guardado/actualizado con tus valoraciones!")
         st.balloons()
         
-        st.session_state[nombre_key_session] = "" 
+        st.session_state[nombre_key_session] = "" # Limpiar el campo del nombre del jugador
         st.rerun()
 
 def render_player_profiles_page(datos):
@@ -434,7 +509,6 @@ def generar_analisis_texto(nombre_equipo_seleccionado, equipo_seleccionado_nombr
     if numeric_df_team_attrs.empty: return "Los atributos del equipo seleccionado no son numéricos para el análisis."
     team_avg_attrs = numeric_df_team_attrs.mean().to_dict()
 
-    # SOBREINDEXACIÓN 
     sobreindexa_items = []
     for attr, team_val in team_avg_attrs.items():
         global_val = promedios_globales_todos_jugadores.get(attr, 0)
@@ -446,30 +520,29 @@ def generar_analisis_texto(nombre_equipo_seleccionado, equipo_seleccionado_nombr
     
     sobreindexa_text = "\n".join([f"* {item}" for item in sobreindexa_items]) if sobreindexa_items else "* El equipo muestra un perfil equilibrado sin una sobreindexación clara en atributos específicos comparado al promedio general."
 
-    # MEJOR ESTILO TÁCTICO (excluyendo Equilibrio General de la competencia directa)
     arquero_sel = None
     for nombre_jugador in equipo_seleccionado_nombres: 
         if datos_completos_todos_jugadores.get(nombre_jugador, {}).get(KEY_TIPO) == TIPO_ARQUERO:
             arquero_sel = nombre_jugador
             break
     
-    # Calcular scores para estilos tácticos
     scores_tacticos = {
         "Catenaccio": calcular_score_catenaccio(equipo_seleccionado_nombres, promedios_equipo_sel, roles_equipo_sel, arquero_sel),
         "Tiki-Taka": calcular_score_tikitaka(equipo_seleccionado_nombres, promedios_equipo_sel, roles_equipo_sel, arquero_sel),
         "Contraataque": calcular_score_contraataque(equipo_seleccionado_nombres, promedios_equipo_sel, roles_equipo_sel, arquero_sel),
     }
-    mejor_estilo_tactico_nombre = max(scores_tacticos, key=scores_tacticos.get)
+    mejor_estilo_tactico_nombre = "Ninguno destacado"
+    if scores_tacticos : # Asegurarse que no está vacío
+        mejor_estilo_tactico_nombre = max(scores_tacticos, key=scores_tacticos.get)
+
     score_equilibrio_general = calcular_score_equipo_general(equipo_seleccionado_nombres, promedios_equipo_sel)
 
     mejor_estilo_text = (
         f"El **mejor estilo táctico** para '{nombre_equipo_seleccionado}' parece ser: **{mejor_estilo_tactico_nombre}** "
-        f"(Puntaje Táctico: {scores_tacticos[mejor_estilo_tactico_nombre]:.1f}).\n"
+        f"(Puntaje Táctico: {scores_tacticos.get(mejor_estilo_tactico_nombre, 0):.1f}).\n"
         f"* Puntaje de Equilibrio General del equipo: {score_equilibrio_general:.1f}."
     )
 
-
-    # PUNTOS FUERTES 
     sorted_team_attrs = sorted(team_avg_attrs.items(), key=lambda item: item[1], reverse=True)
     puntos_fuertes_items = [f"{ATTR_DISPLAY_NAMES.get(clave, clave)} ({v:.1f})" for clave,v in sorted_team_attrs[:3] if v > 6.0] 
     if not puntos_fuertes_items: puntos_fuertes_items.append("No se identifican puntos fuertes dominantes basados en atributos individuales muy altos.")
@@ -479,15 +552,13 @@ def generar_analisis_texto(nombre_equipo_seleccionado, equipo_seleccionado_nombr
     if roles_presentes_str:
         puntos_fuertes_items.append(f"Combinación de roles de campo: {roles_presentes_str}.")
     else:
-        if not arquero_sel: # Si no hay arquero y no hay otros roles de campo
+        if not arquero_sel: 
              puntos_fuertes_items.append("El equipo se compone de jugadores sin un rol claramente definido.")
-        elif len(equipo_seleccionado_nombres) > 1: # Hay arquero pero no otros roles de campo definidos
+        elif len(equipo_seleccionado_nombres) > 1: 
             puntos_fuertes_items.append("Los jugadores de campo tienen perfiles versátiles sin un rol especializado dominante.")
-
 
     puntos_fuertes_text = "\n".join([f"* {item}" for item in puntos_fuertes_items])
 
-    # PUNTOS DÉBILES 
     puntos_debiles_items = [f"{ATTR_DISPLAY_NAMES.get(clave, clave)} ({v:.1f})" for clave,v in sorted_team_attrs[-3:] if v < 5.0] 
     if not puntos_debiles_items: puntos_debiles_items.append("El equipo no muestra debilidades críticas obvias en atributos individuales.")
     puntos_debiles_text = "\n".join([f"* {item}" for item in puntos_debiles_items])
@@ -538,14 +609,23 @@ def render_team_analysis_page(datos_jugadores_todos):
             max_selections=5 
         )
         
+        # Usar una key diferente para el widget de text_input para asegurar que se refresca correctamente
+        # si el valor en session_state cambia por otra vía (aunque aquí no es el caso principal, es buena práctica)
+        nombre_equipo_manual_key_widget = "text_input_nombre_equipo_manual_widget_v4"
+        nombre_equipo_manual_key_session = "nombre_equipo_manual_input_v4"
+
+        if nombre_equipo_manual_key_session not in st.session_state:
+            st.session_state[nombre_equipo_manual_key_session] = ""
+
         nombre_equipo_manual = st.text_input("Nombre para tu equipo (opcional):", 
-                                             value=st.session_state.get('nombre_equipo_manual_input_v3', ""),  
-                                             key="text_input_nombre_equipo_manual_widget_v3").strip() 
-        st.session_state.nombre_equipo_manual_input_v3 = nombre_equipo_manual 
+                                             value=st.session_state[nombre_equipo_manual_key_session], 
+                                             key=nombre_equipo_manual_key_widget).strip()
+        st.session_state[nombre_equipo_manual_key_session] = nombre_equipo_manual # Actualizar session_state con el input
+        
         nombre_equipo_manual_display = nombre_equipo_manual if nombre_equipo_manual else "Equipo Seleccionado"
 
 
-        if st.button("⚡ Analizar Equipo Seleccionado", key="analizar_equipo_manual_btn_v2"):
+        if st.button("⚡ Analizar Equipo Seleccionado", key="analizar_equipo_manual_btn_v3"): # Nueva key para el botón
             if len(st.session_state.manual_team_selection) == 5: 
                 equipo_nombres = st.session_state.manual_team_selection
                 
@@ -643,3 +723,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
