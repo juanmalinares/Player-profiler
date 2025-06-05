@@ -318,4 +318,40 @@ def main():
             # Mejor Tiki-Taka (control, pase, mental)
             def score_tikitaka(p):
                 return (
-                    proms[p].get("First_Touch_Control",0) +
+                    proms[p].get("First_Touch_Control",0) + proms[p].get("Short_Passing_Accuracy",0) +
+                    proms[p].get("Ball_Retention",0) + proms[p].get("Tactical_Awareness",0) +
+                    proms[p].get("Creativity",0) + proms[p].get("Decision_Making_Speed",0) +
+                    proms[p].get("Composure",0) + proms[p].get("Spatial_Awareness",0)
+                )
+            # Mejor Ruleta Rusa (más diferencial entre grupos)
+            def score_ruleta_rusa(p):
+                return score_ruletarusa(proms[p])
+
+            # Utilidad para seleccionar 5 mejores por puntaje (1 arquero)
+            def mejores_equipo(score_func):
+                arqs = [p for p in nombres if proms[p].get("GK_Reaction",0) > 0]
+                campos = [p for p in nombres if proms[p].get("GK_Reaction",0) == 0]
+                # Siempre 1 arquero, resto mejores
+                if not arqs or len(campos) < 4:
+                    return []
+                mejor_arq = max(arqs, key=score_func)
+                mejores = sorted(campos, key=score_func, reverse=True)[:4]
+                return [mejor_arq] + mejores
+
+            for label, fun, color in [
+                ("Mejor Catenaccio", score_cat, "#669bbc"),
+                ("Mejor Contraataque", score_contra, "#c1121f"),
+                ("Mejor Tiki-Taka", score_tikitaka, "#669bbc"),
+                ("Mejor Ruleta Rusa", score_ruleta_rusa, "#ffb703"),
+            ]:
+                eq = mejores_equipo(fun)
+                if eq:
+                    st.markdown(
+                        f"<span style='color:{color}; font-size:1.1rem;'><b>{label}:</b> {', '.join(eq)}</span>",
+                        unsafe_allow_html=True
+                    )
+                else:
+                    st.markdown(f"{label}: No hay suficientes jugadores para armar el equipo.")
+
+if __name__ == "__main__":
+    main()
