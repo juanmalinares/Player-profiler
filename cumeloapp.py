@@ -17,7 +17,8 @@ TIPO_ARQUERO = "Arquero"
 
 EMOJI = {
     "Arquero": "🧤", "Muralla": "🛡️", "Gladiador": "🦾",
-    "Orquestador": "🎼", "Wildcard": "🎲", "Topadora": "🚜"
+    "Orquestador": "🎼", "Wildcard": "🎲", "Topadora": "🚜",
+    "Versátil": "♟️" 
 }
 
 COMPARABLES = {
@@ -27,6 +28,7 @@ COMPARABLES = {
     "Wildcard": ["Ángel Di María", "Vinícius Jr", "Eden Hazard"],
     "Muralla": ["Walter Samuel", "Kalidou Koulibaly", "Paolo Maldini"],
     "Topadora": ["Jude Bellingham", "Leon Goretzka", "Sergej Milinković-Savić"],
+    "Versátil": ["Antoine Griezmann", "Bernardo Silva"] 
 }
 
 ATRIBUTOS_CAMPO_DEF = [ 
@@ -34,7 +36,8 @@ ATRIBUTOS_CAMPO_DEF = [
     ("Vision_Free_Player", "Visión para encontrar compañeros libres"),("Finishing_Precision", "Precisión al definir ocasiones de gol"),
     ("Dribbling_Efficiency", "Eficiencia de regate en espacios reducidos"),("Power_Dribble_and_Score","Prob. de regatear a 3 y marcar"),
     ("Ball_Retention", "Retención de posesión bajo presión"),("Tactical_Awareness", "Comprensión táctica y posicionamiento"),
-    ("Marking_Tightness", "Frecuencia con que pierde la marca sin balón"),("Pressing_Consistency", "Constancia en la presión sin posesión"),
+    ("Marking_Tightness", "Frecuencia con que pierde la marca sin balón"), 
+    ("Pressing_Consistency", "Constancia en la presión sin posesión"),
     ("Recovery_Runs", "Efectividad al volver para defender"),("Acceleration", "Aceleración desde parado"),
     ("Agility", "Agilidad para cambiar de dirección"),("Stamina", "Resistencia para mantener esfuerzo intenso"),
     ("Strength_in_Duels", "Fuerza en duelos cuerpo a cuerpo"),("Balance", "Equilibrio al ser desafiado o regatear"),
@@ -120,14 +123,12 @@ def promedio_atributos(votaciones):
     return num_df.mean(axis=0).to_dict() if not num_df.empty else {}
 
 def obtener_rol(pr, tipo_jugador=TIPO_CAMPO):
-    if not pr: return "Orquestador", {"Orquestador": 1.0} # Fallback si no hay atributos
+    if not pr: return "Versátil", {"Versátil": 1.0} 
     if tipo_jugador == TIPO_ARQUERO: return "Arquero", {"Arquero": 1.0}
 
-    # --- INICIO DE LÓGICA DE ORQUESTADOR MODIFICADA ---
-    # Umbrales para ser considerado Orquestador
-    UMBRAL_VISION = 3.0
-    UMBRAL_PASE_CORTO = 3.0
-    UMBRAL_CREATIVIDAD = 2.0 # Ligeramente menor, ya que la creatividad pura puede ser más rara
+    UMBRAL_VISION = 6.0       
+    UMBRAL_PASE_CORTO = 6.0   
+    UMBRAL_CREATIVIDAD = 5.0  
 
     es_candidato_orquestador = (
         pr.get("Vision_Free_Player", 0) >= UMBRAL_VISION and
@@ -135,76 +136,57 @@ def obtener_rol(pr, tipo_jugador=TIPO_CAMPO):
         pr.get("Creativity", 0) >= UMBRAL_CREATIVIDAD
     )
 
-    score_orquestador = 0 # Inicializar en 0
+    score_orquestador = 0 
     if es_candidato_orquestador:
-        # Pesos ajustados para Orquestador
         score_orquestador = (
-            pr.get("Vision_Free_Player", 0) * 3.0       # Aumentado
-            + pr.get("Short_Passing_Accuracy", 0) * 3.0  # Aumentado
-            + pr.get("Creativity", 0) * 2.5             # Aumentado
-            + pr.get("Decision_Making_Speed", 0) * 1.0  # Reducido
-            + pr.get("First_Touch_Control", 0) * 1.0    # Reducido
-            + pr.get("Spatial_Awareness", 0) * 1.0      # Reducido
-            + pr.get("Tactical_Awareness", 0) * 0.5     # Reducido
-            + pr.get("Composure", 0) * 0.5              # Reducido
-            + pr.get("Ball_Retention", 0) * 0.5         # Mantenido bajo
+            pr.get("Vision_Free_Player", 0) * 3.0       
+            + pr.get("Short_Passing_Accuracy", 0) * 3.0  
+            + pr.get("Creativity", 0) * 2.5             
+            + pr.get("Decision_Making_Speed", 0) * 1.0  
+            + pr.get("First_Touch_Control", 0) * 1.0    
+            + pr.get("Spatial_Awareness", 0) * 1.0      
+            + pr.get("Tactical_Awareness", 0) * 0.5     
+            + pr.get("Composure", 0) * 0.5              
+            + pr.get("Ball_Retention", 0) * 0.5         
         )
-    # Si no es candidato, score_orquestador permanece en 0 (o un valor muy bajo si se prefiere penalizar más)
-    # --- FIN DE LÓGICA DE ORQUESTADOR MODIFICADA ---
 
     scores = {
         "Wildcard": pr.get("Finishing_Precision",0)*1.5 + pr.get("Attack_Transition",0)*1.5 + pr.get("Dribbling_Efficiency",0)*1.5 + pr.get("Power_Dribble_and_Score",0)*1 + pr.get("Acceleration",0)*1.5 + pr.get("Creativity",0)*1 - pr.get("Pressing_Consistency",0)*0.5 - pr.get("Recovery_Runs",0)*0.5,
         "Muralla": pr.get("Strength_in_Duels",0)*2 + pr.get("Tactical_Awareness",0)*1.5 + pr.get("Marking_Tightness",0)*1.5 + pr.get("Defense_Transition",0)*1 + pr.get("Leadership_Presence",0)*1 + pr.get("Recovery_Runs",0)*1 + pr.get("Pressing_Consistency",0)*0.5,
         "Gladiador": pr.get("Stamina",0)*2 + pr.get("Pressing_Consistency",0)*1.5 + pr.get("Recovery_Runs",0)*1.5 + pr.get("Strength_in_Duels",0)*1 + pr.get("Resilience_When_Behind",0)*1 + pr.get("Composure",0)*0.5 + pr.get("Marking_Tightness",0)*0.5,
-        "Orquestador": score_orquestador, # Usar el score calculado con umbrales y nuevos pesos
+        "Orquestador": score_orquestador, 
         "Topadora": pr.get("Power_Dribble_and_Score",0)*2 + pr.get("Finishing_Precision",0)*1.5 + pr.get("Acceleration",0)*1.5 + pr.get("Strength_in_Duels",0)*1 + pr.get("Attack_Transition",0)*1 + pr.get("Ball_Retention",0)*0.5
     }
     valid_scores = {k: v for k, v in scores.items() if v is not None} 
     sum_pos = sum(max(0,s) for s in valid_scores.values())
     
-    # Fallback si ningún rol tiene score positivo
-    # Si Orquestador no cumplió umbrales, su score será 0,
-    # y si los otros también son 0 o negativos, se necesita un default.
-    # Podríamos introducir un rol "Versátil" o mantener Orquestador como el último recurso
-    # pero solo si todos los demás son peores.
     if not valid_scores or sum_pos == 0: 
-        # Si es_candidato_orquestador es False, no debería ser Orquestador por defecto.
-        # En este caso, podríamos buscar el rol menos negativo, o un default genérico.
-        # Por simplicidad, si todo es 0, el `max` podría elegir Orquestador si su score fue 0.
-        # Para evitar que un "no-Orquestador" sea Orquestador por defecto,
-        # si no es candidato Y todos los demás scores son <=0, podría devolverse "Versátil"
-        if not es_candidato_orquestador and all(s <= 0 for s in valid_scores.values() if k != "Orquestador"):
-             return "Versátil", {"Versátil": 1.0} # Ejemplo de nuevo rol default
-        return "Orquestador", {"Orquestador": 1.0} # Fallback original si Orquestador sigue siendo el "mejor" entre ceros/negativos
+        if not es_candidato_orquestador: 
+             return "Versátil", {"Versátil": 1.0} 
+        return "Orquestador", {"Orquestador": 1.0} 
     
     dist = {k: (max(0,v)/sum_pos if sum_pos > 0 else 0) for k,v in valid_scores.items()}
     
-    # Si después de la normalización, el score de Orquestador es muy bajo (porque no cumplió umbrales)
-    # y es el máximo solo porque otros son negativos o cero, se podría reconsiderar.
-    # Pero la lógica actual de `max(dist, key=dist.get)` elegirá el que tenga la mayor proporción positiva.
-    rol_princ = max(dist, key=dist.get) if dist else "Versátil" # Default a "Versátil" si dist queda vacío
+    rol_princ = max(dist, key=dist.get) if dist else "Versátil" 
     
-    # Asegurar que si rol_princ es Orquestador, realmente fue un candidato. Sino, elegir el segundo mejor o "Versátil".
     if rol_princ == "Orquestador" and not es_candidato_orquestador:
-        # Quitar Orquestador de las opciones y re-evaluar si hay otros roles con score positivo
         dist_sin_orquestador_no_candidato = {k:v for k,v in dist.items() if k != "Orquestador"}
         if dist_sin_orquestador_no_candidato and any(v > 0 for v in dist_sin_orquestador_no_candidato.values()):
             rol_princ = max(dist_sin_orquestador_no_candidato, key=dist_sin_orquestador_no_candidato.get)
-        else: # Si no hay otros roles positivos, o dist_sin_orquestador está vacío
-            rol_princ = "Versátil" # Fallback a un rol más genérico
-            dist = {"Versátil": 1.0} # Asegurar que la distribución refleje esto
+        else: 
+            rol_princ = "Versátil" 
+            dist = {"Versátil": 1.0} 
 
     return rol_princ, dist
 
 def descripcion_jugador(rol): return {
     "Muralla": "Defensa física e imponente.", "Gladiador": "Incansable y comprometido.",
-    "Orquestador": "Organiza con visión, pase y creatividad. Toma decisiones clave en la creación.", # Descripción actualizada
+    "Orquestador": "Organiza con visión, pase y creatividad. Toma decisiones clave en la creación.", 
     "Wildcard": "Desequilibrante e individualista.",
     "Topadora": "Potente y llegador.", "Arquero": "Especialista bajo palos.",
-    "Versátil": "Jugador polivalente con un perfil equilibrado." # Nueva descripción
-}.get(rol, "Indefinido.") # Cambiado el default
+    "Versátil": "Jugador polivalente con un perfil equilibrado."
+}.get(rol, "Indefinido.")
 
-# --- Style Specific Scoring Functions (Globally Defined) ---
 def calcular_score_equipo_general(equipo_nombres_lista, promedios_jugadores_dict):
     score_total = 0
     for jugador_nombre in equipo_nombres_lista:
@@ -212,24 +194,24 @@ def calcular_score_equipo_general(equipo_nombres_lista, promedios_jugadores_dict
             score_total += sum(val for val in promedios_jugadores_dict[jugador_nombre].values() if isinstance(val, (int, float)))
     return score_total
 
-def calcular_score_catenaccio(equipo, promedios_j, roles_e, aq_name=None): # aq_name puede ser None
-    score, w_c, w_i, w_m, w_b = 0, 2.5, 1.5, 1.0, 0.5
-    bm, bg, bjrd = 15, 10, 5
+def calcular_score_catenaccio(equipo, promedios_j, roles_e, aq_name=None):
+    score, w_c, w_i, w_m, w_b = 0, 2.5, 1.5, 1.0, 0.5 
+    bm, bg, bjrd = 30, 20, 10 
     nm, ng, hay_jrd = 0,0,False
     for jn in equipo:
         pr, rj = promedios_j.get(jn,{}), roles_e.get(jn,"")
         if not pr: continue
         ps = 0
-        if jn == aq_name: # Solo si hay un arquero definido y es este jugador
+        if jn == aq_name: 
             ps = pr.get("GK_Positioning",0)*w_c + pr.get("GK_Reaction",0)*w_c + pr.get("GK_Bravery",0)*w_i + pr.get("GK_Agility",0)*w_m + pr.get("GK_Distribution",0)*w_b + pr.get("Composure",0)*w_b
-        else: # Jugador de campo o arquero jugando de campo
+        else: 
             ps = pr.get("Marking_Tightness",0)*w_c + pr.get("Tactical_Awareness",0)*w_c + pr.get("Strength_in_Duels",0)*w_c + pr.get("Resilience_When_Behind",0)*w_i + pr.get("Composure",0)*w_i + pr.get("Defense_Transition",0)*w_m + pr.get("Recovery_Runs",0)*w_m + pr.get("Leadership_Presence",0)*w_m + pr.get("Pressing_Consistency",0)*w_b
             if datos_jugadores_global.get(jn, {}).get(KEY_TIPO) == TIPO_ARQUERO and jn != aq_name : 
                 ps += pr.get("GK_Bravery",0) * w_b 
-            if pr.get("Recovery_Runs",2.5)<2 and pr.get("Power_Dribble_and_Score",0)>3: ps-=5
+            if pr.get("Recovery_Runs",5.0)<4 and pr.get("Power_Dribble_and_Score",0)>6: ps-=10 
             if rj=="Muralla": nm+=1
             if rj=="Gladiador": ng+=1
-            if rj not in ["Muralla","Gladiador"] and (pr.get("Acceleration",0)>=4 or pr.get("Dribbling_Efficiency",0)>=4): hay_jrd=True
+            if rj not in ["Muralla","Gladiador"] and (pr.get("Acceleration",0)>=7 or pr.get("Dribbling_Efficiency",0)>=7): hay_jrd=True
         score += ps
     if nm>0: score += bm*nm
     if ng>0: score += bg*ng
@@ -238,7 +220,7 @@ def calcular_score_catenaccio(equipo, promedios_j, roles_e, aq_name=None): # aq_
 
 def calcular_score_tikitaka(equipo, promedios_j, roles_e, aq_name=None):
     score, w_c, w_i, w_m, w_b = 0, 2.5, 1.5, 1.0, 0.5
-    pusp, bo = -5, 15
+    pusp, bo = -10, 30 
     no, ndcpm = 0,0
     for jn in equipo:
         pr, rj = promedios_j.get(jn,{}), roles_e.get(jn,"")
@@ -250,19 +232,19 @@ def calcular_score_tikitaka(equipo, promedios_j, roles_e, aq_name=None):
             ps = pr.get("Short_Passing_Accuracy",0)*w_c + pr.get("First_Touch_Control",0)*w_c + pr.get("Vision_Free_Player",0)*w_i + pr.get("Ball_Retention",0)*w_i + pr.get("Spatial_Awareness",0)*w_i + pr.get("Tactical_Awareness",0)*w_m + pr.get("Composure",0)*w_m + pr.get("Decision_Making_Speed",0)*w_b + pr.get("Creativity",0)*w_b
             if datos_jugadores_global.get(jn, {}).get(KEY_TIPO) == TIPO_ARQUERO and jn != aq_name : 
                  ps += pr.get("GK_Foot_Play",0) * w_m 
-            if pr.get("Acceleration",0)>3 and pr.get("Ball_Retention",0)<2: ps-=3
-            if pr.get("Dribbling_Efficiency",0)>3 and pr.get("Short_Passing_Accuracy",0)<2: ps-=3
-            if pr.get("Marking_Tightness",5)<=1 and pr.get("Strength_in_Duels",0)>=4 and pr.get("Short_Passing_Accuracy",0)<2: ps+=pusp
+            if pr.get("Acceleration",0)>6 and pr.get("Ball_Retention",0)<4: ps-=6
+            if pr.get("Dribbling_Efficiency",0)>6 and pr.get("Short_Passing_Accuracy",0)<4: ps-=6
+            if pr.get("Marking_Tightness",10)<=2 and pr.get("Strength_in_Duels",0)>=7 and pr.get("Short_Passing_Accuracy",0)<4: ps+=pusp
             if rj=="Orquestador": no+=1
-            if rj in ["Muralla","Gladiador"] and pr.get("Short_Passing_Accuracy",0)>=2: ndcpm+=1
+            if rj in ["Muralla","Gladiador"] and pr.get("Short_Passing_Accuracy",0)>=4: ndcpm+=1 
         score += ps
     if no>0: score += bo*no
-    if ndcpm>=1: score += 5
+    if ndcpm>=1: score += 10 
     return score
 
 def calcular_score_contraataque(equipo, promedios_j, roles_e, aq_name=None):
     score, w_c, w_i, w_m, w_b = 0, 2.5, 1.5, 1.0, 0.5
-    pjl, bw, bt, bdtp, stfb = -5, 10, 10, 7, 3.5
+    pjl, bw, bt, bdtp, stfb = -10, 20, 20, 14, 7.0 
     nw, nt, jcbtd, ssc, njc = 0,0,0,0,0
     for jn in equipo:
         pr, rj = promedios_j.get(jn,{}), roles_e.get(jn,"")
@@ -276,18 +258,17 @@ def calcular_score_contraataque(equipo, promedios_j, roles_e, aq_name=None):
             ps = pr.get("Attack_Transition",0)*w_c + pr.get("Acceleration",0)*w_c + pr.get("Finishing_Precision",0)*w_i + pr.get("Agility",0)*w_i + pr.get("Dribbling_Efficiency",0)*w_m + pr.get("Power_Dribble_and_Score",0)*w_m + pr.get("Decision_Making_Speed",0)*w_m + pr.get("Vision_Free_Player",0)*w_b
             if datos_jugadores_global.get(jn, {}).get(KEY_TIPO) == TIPO_ARQUERO and jn != aq_name: 
                 ps += pr.get("GK_Distribution",0) * w_b 
-            if pr.get("Ball_Retention",0)>3 and pr.get("Acceleration",0)<2: ps+=pjl
+            if pr.get("Ball_Retention",0)>6 and pr.get("Acceleration",0)<4: ps+=pjl
             if rj=="Wildcard": nw+=1
             if rj=="Topadora": nt+=1
-            if pr.get("Defense_Transition",0)>=4: jcbtd+=1
+            if pr.get("Defense_Transition",0)>=7: jcbtd+=1 
         score += ps
     if nw>0: score += bw*nw
     if nt>0: score += bt*nt
     if jcbtd>0: score += bdtp
-    if njc>0 and (ssc/njc)>=stfb: score+=10
+    if njc>0 and (ssc/njc)>=stfb: score+=20 
     return score
 
-# --- UI Rendering Functions ---
 def render_sidebar(datos_jug, user_name):
     st.sidebar.title("⚽ Menú")
     st.sidebar.markdown(f"Usuario: **{user_name}**")
@@ -354,16 +335,17 @@ def render_add_edit_player_page(datos, usuario):
 
     st.caption(caption_text)
 
+    default_slider_val = 5 
     st.markdown("---"); st.subheader("Atributos de Campo")
-    for k,q in ATRIBUTOS_CAMPO_DEF: attrs_actuales[k] = st.slider(q,0,5,int(round(ratings.get(k,2))),key=f"slider_{nombre_jugador}_{k}")
+    for k,q in ATRIBUTOS_CAMPO_DEF: attrs_actuales[k] = st.slider(q,0,10,int(round(ratings.get(k, default_slider_val))),key=f"slider_{nombre_jugador}_{k}")
     st.markdown("---")
     if tipo_jugador == TIPO_CAMPO:
         st.subheader("Atributos Adicionales (Portero para Jugador de Campo)")
         d_aq_atr = dict(ATRIBUTOS_ARQUERO_DEF)
-        for k in ATR_GK_CAMPO: attrs_actuales[k] = st.slider(d_aq_atr.get(k,k.replace("_"," ")),0,5,int(round(ratings.get(k,2))),key=f"slider_{nombre_jugador}_{k}_gkc")
+        for k in ATR_GK_CAMPO: attrs_actuales[k] = st.slider(d_aq_atr.get(k,k.replace("_"," ")),0,10,int(round(ratings.get(k,default_slider_val))),key=f"slider_{nombre_jugador}_{k}_gkc")
     elif tipo_jugador == TIPO_ARQUERO:
         st.subheader("Atributos de Arquero")
-        for k,q in ATRIBUTOS_ARQUERO_DEF: attrs_actuales[k] = st.slider(q,0,5,int(round(ratings.get(k,2))),key=f"slider_{nombre_jugador}_{k}_aq")
+        for k,q in ATRIBUTOS_ARQUERO_DEF: attrs_actuales[k] = st.slider(q,0,10,int(round(ratings.get(k,default_slider_val))),key=f"slider_{nombre_jugador}_{k}_aq")
 
     if st.button("💾 Guardar/Actualizar Jugador", key="save_player_btn_ae"):
         nombre_a_guardar = st.session_state[nombre_key_session].strip() 
@@ -398,18 +380,16 @@ def render_player_profiles_page(datos):
         rol, dist = obtener_rol(proms, info_jugador.get(KEY_TIPO, TIPO_CAMPO))
         roles_ord = sorted(dist.items(), key=lambda item:item[1], reverse=True)
         rol_sec_str = "N/A"
-        # Mostrar rol secundario solo si es diferente del principal y tiene un score significativo
-        if len(roles_ord) > 1 and roles_ord[0][0] != roles_ord[1][0] and roles_ord[1][1] > 0.1: # Umbral para rol secundario
+        if len(roles_ord) > 1 and roles_ord[0][0] != roles_ord[1][0] and roles_ord[1][1] > 0.1: 
              rol_sec_str = f"{roles_ord[1][0]} ({roles_ord[1][1]*100:.0f}%)"
-        elif len(roles_ord) == 1 and roles_ord[0][0] != rol : # Caso raro, si el rol principal no fue el único en dist.
-             pass # No mostrar rol secundario si solo hay un rol o el principal es el único con score > 0.1
-
+        elif len(roles_ord) == 1 and roles_ord[0][0] != rol : 
+             pass 
 
         perfil = {"Nombre":f"{EMOJI.get(rol,'👤')} {name}", "Rol principal":rol, "Rol secundario":rol_sec_str, 
                   "Descripción":descripcion_jugador(rol), "Comparables":", ".join(COMPARABLES.get(rol,["N/A"]))}
         
         all_attr_keys = [k for k,_ in ATRIBUTOS_CAMPO_DEF] + [k for k,_ in ATRIBUTOS_ARQUERO_DEF] 
-        for attr_k in all_attr_keys: perfil[attr_k] = round(proms.get(attr_k,0),1)
+        for attr_k in all_attr_keys: perfil[attr_k] = round(proms.get(attr_k,0),1) 
         perfiles.append(perfil)
 
     if perfiles:
@@ -454,50 +434,61 @@ def generar_analisis_texto(nombre_equipo_seleccionado, equipo_seleccionado_nombr
     if numeric_df_team_attrs.empty: return "Los atributos del equipo seleccionado no son numéricos para el análisis."
     team_avg_attrs = numeric_df_team_attrs.mean().to_dict()
 
-    # SOBREINDEXACIÓN
+    # SOBREINDEXACIÓN 
     sobreindexa_items = []
     for attr, team_val in team_avg_attrs.items():
         global_val = promedios_globales_todos_jugadores.get(attr, 0)
         attr_nombre_display = ATTR_DISPLAY_NAMES.get(attr, attr.replace("_"," "))
-        if global_val > 0.5 and team_val > global_val * 1.15: 
+        if global_val > 1.0 and team_val > global_val * 1.15: 
             sobreindexa_items.append(f"{attr_nombre_display} ({team_val:.1f} vs prom. global {global_val:.1f})")
-        elif team_val > 4.0 and global_val < 3.5 :
+        elif team_val > 8.0 and global_val < 7.0 :
              sobreindexa_items.append(f"{attr_nombre_display} ({team_val:.1f}, destacado globalmente)")
     
     sobreindexa_text = "\n".join([f"* {item}" for item in sobreindexa_items]) if sobreindexa_items else "* El equipo muestra un perfil equilibrado sin una sobreindexación clara en atributos específicos comparado al promedio general."
 
-    # MEJOR ESTILO
+    # MEJOR ESTILO TÁCTICO (excluyendo Equilibrio General de la competencia directa)
     arquero_sel = None
     for nombre_jugador in equipo_seleccionado_nombres: 
         if datos_completos_todos_jugadores.get(nombre_jugador, {}).get(KEY_TIPO) == TIPO_ARQUERO:
             arquero_sel = nombre_jugador
             break
     
-    scores_estilos = {
-        "Equilibrio General": calcular_score_equipo_general(equipo_seleccionado_nombres, promedios_equipo_sel),
+    # Calcular scores para estilos tácticos
+    scores_tacticos = {
         "Catenaccio": calcular_score_catenaccio(equipo_seleccionado_nombres, promedios_equipo_sel, roles_equipo_sel, arquero_sel),
         "Tiki-Taka": calcular_score_tikitaka(equipo_seleccionado_nombres, promedios_equipo_sel, roles_equipo_sel, arquero_sel),
         "Contraataque": calcular_score_contraataque(equipo_seleccionado_nombres, promedios_equipo_sel, roles_equipo_sel, arquero_sel),
     }
-    mejor_estilo_nombre = max(scores_estilos, key=scores_estilos.get)
-    mejor_estilo_text = f"El estilo de juego más afín para '{nombre_equipo_seleccionado}' parece ser: **{mejor_estilo_nombre}** (Puntaje: {scores_estilos[mejor_estilo_nombre]:.1f})."
+    mejor_estilo_tactico_nombre = max(scores_tacticos, key=scores_tacticos.get)
+    score_equilibrio_general = calcular_score_equipo_general(equipo_seleccionado_nombres, promedios_equipo_sel)
 
-    # PUNTOS FUERTES
+    mejor_estilo_text = (
+        f"El **mejor estilo táctico** para '{nombre_equipo_seleccionado}' parece ser: **{mejor_estilo_tactico_nombre}** "
+        f"(Puntaje Táctico: {scores_tacticos[mejor_estilo_tactico_nombre]:.1f}).\n"
+        f"* Puntaje de Equilibrio General del equipo: {score_equilibrio_general:.1f}."
+    )
+
+
+    # PUNTOS FUERTES 
     sorted_team_attrs = sorted(team_avg_attrs.items(), key=lambda item: item[1], reverse=True)
-    puntos_fuertes_items = [f"{ATTR_DISPLAY_NAMES.get(clave, clave)} ({v:.1f})" for clave,v in sorted_team_attrs[:3] if v > 3.0] 
+    puntos_fuertes_items = [f"{ATTR_DISPLAY_NAMES.get(clave, clave)} ({v:.1f})" for clave,v in sorted_team_attrs[:3] if v > 6.0] 
     if not puntos_fuertes_items: puntos_fuertes_items.append("No se identifican puntos fuertes dominantes basados en atributos individuales muy altos.")
-    roles_presentes_str = ", ".join(set(r for r in roles_equipo_sel.values() if r != "Arquero")) # No incluir "Arquero" como rol de campo en el resumen
-    if arquero_sel: # Si hay un arquero, mencionarlo por separado
+    roles_presentes_str = ", ".join(set(r for r in roles_equipo_sel.values() if r != "Arquero")) 
+    if arquero_sel: 
         puntos_fuertes_items.append(f"Presencia de Arquero: {arquero_sel}.")
     if roles_presentes_str:
         puntos_fuertes_items.append(f"Combinación de roles de campo: {roles_presentes_str}.")
     else:
-        puntos_fuertes_items.append("El equipo se compone principalmente de jugadores sin un rol de campo claramente definido o solo arquero.")
+        if not arquero_sel: # Si no hay arquero y no hay otros roles de campo
+             puntos_fuertes_items.append("El equipo se compone de jugadores sin un rol claramente definido.")
+        elif len(equipo_seleccionado_nombres) > 1: # Hay arquero pero no otros roles de campo definidos
+            puntos_fuertes_items.append("Los jugadores de campo tienen perfiles versátiles sin un rol especializado dominante.")
+
 
     puntos_fuertes_text = "\n".join([f"* {item}" for item in puntos_fuertes_items])
 
-    # PUNTOS DÉBILES
-    puntos_debiles_items = [f"{ATTR_DISPLAY_NAMES.get(clave, clave)} ({v:.1f})" for clave,v in sorted_team_attrs[-3:] if v < 2.5] 
+    # PUNTOS DÉBILES 
+    puntos_debiles_items = [f"{ATTR_DISPLAY_NAMES.get(clave, clave)} ({v:.1f})" for clave,v in sorted_team_attrs[-3:] if v < 5.0] 
     if not puntos_debiles_items: puntos_debiles_items.append("El equipo no muestra debilidades críticas obvias en atributos individuales.")
     puntos_debiles_text = "\n".join([f"* {item}" for item in puntos_debiles_items])
 
@@ -548,8 +539,8 @@ def render_team_analysis_page(datos_jugadores_todos):
         )
         
         nombre_equipo_manual = st.text_input("Nombre para tu equipo (opcional):", 
-                                             value=st.session_state.get('nombre_equipo_manual_input_v3', ""),  # Nueva key diferente
-                                             key="text_input_nombre_equipo_manual_widget_v3").strip() # Nueva key para el widget
+                                             value=st.session_state.get('nombre_equipo_manual_input_v3', ""),  
+                                             key="text_input_nombre_equipo_manual_widget_v3").strip() 
         st.session_state.nombre_equipo_manual_input_v3 = nombre_equipo_manual 
         nombre_equipo_manual_display = nombre_equipo_manual if nombre_equipo_manual else "Equipo Seleccionado"
 
@@ -562,14 +553,10 @@ def render_team_analysis_page(datos_jugadores_todos):
                 for nombre_j in equipo_nombres:
                     if datos_jugadores_todos.get(nombre_j, {}).get(KEY_TIPO) == TIPO_ARQUERO:
                         arquero_en_seleccion = nombre_j
-                        # Permitir solo un arquero en la selección manual si se elige uno.
-                        # Si se quieren más, la lógica de análisis debe poder manejarlo,
-                        # pero para las funciones de score actuales, se asume un aq_name o None.
-                        # Si hay más de un TIPO_ARQUERO en la selección de 5, se tomará el primero encontrado.
                         break 
                 
                 proms_eq_sel = {n: promedio_atributos(datos_jugadores_todos[n].get(KEY_VOTACIONES,{})) for n in equipo_nombres if n in datos_jugadores_todos}
-                roles_eq_sel = {n: obtener_rol(proms_eq_sel.get(n,{}), datos_jugadores_todos[n].get(KEY_TIPO, TIPO_CAMPO))[0] for n in equipo_nombres} # Usar proms_eq_sel.get(n,{})
+                roles_eq_sel = {n: obtener_rol(proms_eq_sel.get(n,{}), datos_jugadores_todos[n].get(KEY_TIPO, TIPO_CAMPO))[0] for n in equipo_nombres} 
                 proms_globales = calcular_promedios_globales(datos_jugadores_todos)
 
                 if not proms_globales: st.error("No se calcularon promedios globales para comparación.")
@@ -586,7 +573,7 @@ def render_team_analysis_page(datos_jugadores_todos):
         st.info("No hay jugadores convocados para el análisis automático.")
     else:
         proms_conv_auto = {n: promedio_atributos(datos_jugadores_todos[n].get(KEY_VOTACIONES,{})) for n in convocados_auto}
-        roles_conv_auto = {n: obtener_rol(proms_conv_auto.get(n,{}), datos_jugadores_todos[n].get(KEY_TIPO, TIPO_CAMPO))[0] for n in convocados_auto} # Usar proms_conv_auto.get(n,{})
+        roles_conv_auto = {n: obtener_rol(proms_conv_auto.get(n,{}), datos_jugadores_todos[n].get(KEY_TIPO, TIPO_CAMPO))[0] for n in convocados_auto} 
         campo_conv_auto = [n for n in convocados_auto if datos_jugadores_todos[n].get(KEY_TIPO) == TIPO_CAMPO]
         aq_conv_auto = [n for n in convocados_auto if datos_jugadores_todos[n].get(KEY_TIPO) == TIPO_ARQUERO]
 
@@ -643,9 +630,8 @@ def main():
         st.info("👈 Por favor, ingresa un nombre de usuario en la barra lateral y presiona 'Acceder' para usar la aplicación.")
         st.stop()
     
-    # Inicializar el estado de session_state para el análisis manual aquí, una vez que el usuario es válido.
     if 'manual_team_selection' not in st.session_state: st.session_state.manual_team_selection = []
-    if 'nombre_equipo_manual_input_v3' not in st.session_state: st.session_state.nombre_equipo_manual_input_v3 = "" # Nueva key
+    if 'nombre_equipo_manual_input_v3' not in st.session_state: st.session_state.nombre_equipo_manual_input_v3 = "" 
 
 
     datos_jugadores_global = cargar_datos() 
